@@ -1,6 +1,6 @@
-// ========================================== 
+/ ========================================== 
 
-// NAVEGACIÓN SPA 
+// 1. NAVEGACIÓN SPA (Single Page Application) 
 
 // ========================================== 
 
@@ -18,17 +18,19 @@ function navegarA(idVista) {
 
 // ========================================== 
 
-// MÓDULO 1: NOTICIAS & CHAT 
+// 2. MÓDULO: NOTICIAS & CHAT ASISTENTE 
 
 // ========================================== 
 
 let noticiaCount = 0; 
 
+let contextoReporteActual = null; // Memoria para el chat 
+
  
 
 document.addEventListener("DOMContentLoaded", () => { 
 
-    agregarNoticia(); // Inicia con un campo 
+    agregarNoticia(); // Inicia con un campo vacío 
 
 }); 
 
@@ -39,6 +41,10 @@ function agregarNoticia() {
     noticiaCount++; 
 
     const container = document.getElementById('noticias-container'); 
+
+    if (!container) return; 
+
+ 
 
     const div = document.createElement('div'); 
 
@@ -56,9 +62,9 @@ function agregarNoticia() {
 
         </div> 
 
-        <input type="text" id="link-${noticiaCount}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm mb-2" placeholder="Enlace web (opcional)"> 
+        <input type="text" id="link-${noticiaCount}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm mb-2 focus:outline-none focus:border-teal" placeholder="Enlace web (opcional)"> 
 
-        <textarea id="articulo-${noticiaCount}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm h-24" placeholder="Pega el texto de la noticia..."></textarea> 
+        <textarea id="articulo-${noticiaCount}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm h-24 focus:outline-none focus:border-teal" placeholder="Pega el texto de la noticia aquí..."></textarea> 
 
     `; 
 
@@ -68,15 +74,43 @@ function agregarNoticia() {
 
  
 
-function eliminarNoticia(id) { document.getElementById(`noticia-${id}`)?.remove(); } 
+function eliminarNoticia(id) { 
+
+    document.getElementById(`noticia-${id}`)?.remove(); 
+
+} 
 
  
 
-function analizarNoticias() { 
+async function analizarNoticias() { 
 
     const btn = document.getElementById('btnAnalizarNoticias'); 
 
     const status = document.getElementById('status-noticias'); 
+
+     
+
+    const articulos = []; 
+
+    for (let i = 1; i <= noticiaCount; i++) { 
+
+        const texto = document.getElementById(`articulo-${i}`)?.value.trim(); 
+
+        if (texto) articulos.push(texto); 
+
+    } 
+
+ 
+
+    if (articulos.length === 0) { 
+
+        alert("Por favor, pega el texto de al menos una noticia."); 
+
+        return; 
+
+    } 
+
+ 
 
     btn.disabled = true; btn.classList.add('opacity-50'); 
 
@@ -84,41 +118,87 @@ function analizarNoticias() {
 
  
 
-    // Simulación de respuesta Backend (Sustituir por fetch) 
+    try { 
 
-    setTimeout(() => { 
+        const res = await fetch('/api/analizar', { 
 
-        btn.disabled = false; btn.classList.remove('opacity-50'); 
+            method: 'POST', 
 
-        status.textContent = '¡Completado!'; 
+            headers: { 'Content-Type': 'application/json' }, 
+
+            body: JSON.stringify({ articulos }) 
+
+        }); 
+
+ 
+
+        if (!res.ok) throw new Error("Error en el servidor"); 
+
+        const data = await res.json(); 
 
          
 
+        contextoReporteActual = data; // Guardar para el chat 
+
         document.getElementById('reporte-noticias').classList.remove('hidden'); 
+
+         
+
+        let colorRiesgo = data.riesgo_general?.toLowerCase().includes('alto')  
+
+            ? 'text-red-600 bg-red-50 border-red-500'  
+
+            : 'text-yellow-700 bg-yellow-50 border-yellow-500'; 
+
+         
+
+        let involucradosHTML = (data.involucrados || []).map(inv => ` 
+
+            <li class="mb-2"><strong>${inv.nombre}</strong> - ${inv.rol} <span class="bg-slate-200 text-xs px-2 py-1 rounded ml-2">${inv.estado}</span></li> 
+
+        `).join(''); 
+
+ 
 
         document.getElementById('contenido-noticias').innerHTML = ` 
 
-            <div class="p-4 bg-red-50 border-l-4 border-red-500 rounded text-red-900 mb-4"> 
+            <div class="p-4 border-l-4 rounded mb-4 ${colorRiesgo}"> 
 
-                <strong>Riesgo Detectado: ALTO</strong> - Posibles vínculos con financiamiento ilícito. 
+                <strong class="uppercase">Riesgo Global: ${data.riesgo_general || 'Medio'}</strong> 
 
             </div> 
 
-            <p><strong>Entidades detectadas:</strong> Juan Pérez, Inversiones XYZ.</p> 
+            <p class="mb-4 text-sm leading-relaxed"><strong>Resumen:</strong> ${data.resumen}</p> 
+
+            <h4 class="font-bold text-navy mb-2">Involucrados Detectados:</h4> 
+
+            <ul class="list-disc pl-5 text-sm">${involucradosHTML}</ul> 
 
         `; 
 
  
 
-        document.getElementById('chat-historial').innerHTML = `<div class="text-center text-teal text-xs mb-3 border-b pb-2">Contexto de la noticia cargado. Puedes preguntar.</div>`; 
+        document.getElementById('chat-historial').innerHTML = `<div class="text-center text-teal text-xs mb-3 border-b pb-2">Contexto cargado en memoria. El asistente está listo para tus preguntas.</div>`; 
 
-    }, 1500); 
+        status.textContent = '¡Análisis completado!'; 
+
+ 
+
+    } catch (error) { 
+
+        status.innerHTML = '<span class="text-red-500">Error en el análisis. Revisa la consola.</span>'; 
+
+    } finally { 
+
+        btn.disabled = false; btn.classList.remove('opacity-50'); 
+
+    } 
 
 } 
 
  
 
-function enviarPregunta() { 
+async function enviarPregunta() { 
 
     const input = document.getElementById('chat-input'); 
 
@@ -126,23 +206,51 @@ function enviarPregunta() {
 
     if (!pregunta) return; 
 
+    if (!contextoReporteActual) return alert("Primero debes analizar una noticia para activar el asistente."); 
+
  
 
     const historial = document.getElementById('chat-historial'); 
 
-    historial.innerHTML += `<div class="self-end bg-navy text-white px-3 py-2 rounded-lg text-xs max-w-[85%]">${pregunta}</div>`; 
+    historial.innerHTML += `<div class="self-end bg-navy text-white px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2">${pregunta}</div>`; 
 
     input.value = ''; 
 
+    historial.scrollTop = historial.scrollHeight; 
+
  
 
-    setTimeout(() => { 
+    const idTemp = 'temp-' + Date.now(); 
 
-        historial.innerHTML += `<div class="self-start bg-slate-200 text-navy px-3 py-2 rounded-lg text-xs max-w-[85%]">Basado en el informe, no se detectan transacciones internacionales para las entidades mencionadas.</div>`; 
+    historial.innerHTML += `<div id="${idTemp}" class="self-start bg-slate-200 text-slate-500 px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2"><i class="fa-solid fa-ellipsis fa-fade"></i></div>`; 
 
-        historial.scrollTop = historial.scrollHeight; 
+    historial.scrollTop = historial.scrollHeight; 
 
-    }, 800); 
+ 
+
+    try { 
+
+        const res = await fetch('/api/chat', { 
+
+            method: 'POST', 
+
+            headers: { 'Content-Type': 'application/json' }, 
+
+            body: JSON.stringify({ pregunta, contexto: contextoReporteActual }) 
+
+        }); 
+
+        const data = await res.json(); 
+
+        document.getElementById(idTemp).outerHTML = `<div class="self-start bg-slate-200 text-navy px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2">${data.respuesta}</div>`; 
+
+    } catch (error) { 
+
+        document.getElementById(idTemp).outerHTML = `<div class="self-start bg-red-100 text-red-600 px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2">Error de conexión con el asistente.</div>`; 
+
+    } 
+
+    historial.scrollTop = historial.scrollHeight; 
 
 } 
 
@@ -150,7 +258,7 @@ function enviarPregunta() {
 
 // ========================================== 
 
-// MÓDULO 2: ROS 
+// 3. MÓDULO: ROS (Reporte de Operaciones) 
 
 // ========================================== 
 
@@ -172,29 +280,81 @@ function mostrarArchivos(inputId, listaId) {
 
  
 
-function analizarROS() { 
+async function analizarROS() { 
 
     const btn = document.getElementById('btnAnalizarRos'); 
 
     const status = document.getElementById('status-ros'); 
 
-    btn.disabled = true; btn.classList.add('opacity-50'); 
+    const plantillaPrompt = document.getElementById('rosPlantilla').value.trim(); 
 
-    status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-gold"></i> Consolidando evidencias...'; 
+    const files = document.getElementById('rosArchivos').files; 
 
  
 
-    setTimeout(() => { 
+    if (!plantillaPrompt || files.length === 0) { 
 
-        btn.disabled = false; btn.classList.remove('opacity-50'); 
+        return alert("Ingresa la plantilla y selecciona al menos un documento."); 
 
-        status.textContent = '¡ROS Generado!'; 
+    } 
+
+ 
+
+    btn.disabled = true; btn.classList.add('opacity-50'); 
+
+    status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-gold"></i> Leyendo documentos y generando ROS...'; 
+
+ 
+
+    try { 
+
+        // Extraer texto de los archivos locales (Simplificado para TXT/CSV/JSON en navegador) 
+
+        let textoDocumentos = ""; 
+
+        for (const file of files) { 
+
+            textoDocumentos += `\n--- Archivo: ${file.name} ---\n`; 
+
+            textoDocumentos += await file.text(); // Lee contenido en texto plano 
+
+        } 
+
+ 
+
+        const res = await fetch('/api/generar-ros', { 
+
+            method: 'POST', 
+
+            headers: { 'Content-Type': 'application/json' }, 
+
+            body: JSON.stringify({ plantillaPrompt, textoDocumentos }) 
+
+        }); 
+
+ 
+
+        if (!res.ok) throw new Error("Error en el servidor"); 
+
+        const data = await res.json(); 
+
+ 
 
         document.getElementById('reporte-ros').classList.remove('hidden'); 
 
-        document.getElementById('contenido-ros').textContent = "1. RESUMEN EJECUTIVO\nSe han analizado 3 documentos. No se evidencian inconsistencias mayores, sin embargo, el origen de fondos en el documento 2 (Balance) requiere justificación adicional.\n\n[Informe generado con Temperatura 0 - Imparcialidad garantizada]"; 
+        document.getElementById('contenido-ros').textContent = data.informe; 
 
-    }, 2000); 
+        status.textContent = '¡ROS Generado exitosamente!'; 
+
+    } catch (error) { 
+
+        status.innerHTML = '<span class="text-red-500">Error al generar ROS. ¿Son archivos de texto legibles?</span>'; 
+
+    } finally { 
+
+        btn.disabled = false; btn.classList.remove('opacity-50'); 
+
+    } 
 
 } 
 
@@ -202,9 +362,13 @@ function analizarROS() {
 
 // ========================================== 
 
-// MÓDULO 3: DASHBOARD CLIENTE 
+// 4. MÓDULO: DASHBOARD CLIENTE (Multimodal) 
 
 // ========================================== 
+
+let imagenesBase64 = []; 
+
+ 
 
 function mostrarPreviewImagenes() { 
 
@@ -214,11 +378,11 @@ function mostrarPreviewImagenes() {
 
     preview.innerHTML = ''; 
 
+    imagenesBase64 = []; 
+
      
 
-    // Limitar a 6 
-
-    const files = Array.from(input.files).slice(0, 6);  
+    const files = Array.from(input.files).slice(0, 6); // Límite de 6 imágenes 
 
     files.forEach(file => { 
 
@@ -226,7 +390,11 @@ function mostrarPreviewImagenes() {
 
         reader.onload = (e) => { 
 
-            preview.innerHTML += `<div class="w-24 h-24 rounded-lg border border-slate-300 overflow-hidden shadow-sm"><img src="${e.target.result}" class="w-full h-full object-cover"></div>`; 
+            const base64String = e.target.result; 
+
+            imagenesBase64.push(base64String.split(',')[1]); // Extraer solo la data base64 
+
+            preview.innerHTML += `<div class="w-24 h-24 rounded-lg border border-slate-300 overflow-hidden shadow-sm"><img src="${base64String}" class="w-full h-full object-cover"></div>`; 
 
         }; 
 
@@ -238,46 +406,76 @@ function mostrarPreviewImagenes() {
 
  
 
-function analizarCliente() { 
+async function analizarCliente() { 
 
     const btn = document.getElementById('btnAnalizarCliente'); 
 
     const status = document.getElementById('status-cliente'); 
 
-    btn.disabled = true; btn.classList.add('opacity-50'); 
+     
 
-    status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-purple-600"></i> Procesando imágenes...'; 
+    if (imagenesBase64.length === 0) return alert("Sube al menos una imagen (ej. Cédula o Estado Financiero)."); 
 
  
 
-    setTimeout(() => { 
+    btn.disabled = true; btn.classList.add('opacity-50'); 
 
-        btn.disabled = false; btn.classList.remove('opacity-50'); 
+    status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-purple-600"></i> Analizando imágenes con IA Multimodal...'; 
 
-        status.textContent = 'Dashboard listo.'; 
+ 
+
+    try { 
+
+        const res = await fetch('/api/analizar-cliente', { 
+
+            method: 'POST', 
+
+            headers: { 'Content-Type': 'application/json' }, 
+
+            body: JSON.stringify({ imagenes: imagenesBase64 }) 
+
+        }); 
+
+ 
+
+        if (!res.ok) throw new Error("Error en el servidor"); 
+
+        const data = await res.json(); 
+
+ 
 
         document.getElementById('dashboard-resultado').classList.remove('hidden'); 
 
          
 
+        let alertasHTML = (data.alertas || []).map(alerta => `<li>${alerta}</li>`).join(''); 
+
+         
+
         document.getElementById('dash-perfil').innerHTML = ` 
 
-            <div class="text-3xl font-bold text-teal mb-2">Score: 85/100</div> 
+            <div class="text-3xl font-bold text-teal mb-2">Score: ${data.score_riesgo || 'N/A'}/100</div> 
 
-            <p><strong>Ingresos calculados:</strong> $15,000,000 COP</p> 
+            <p><strong>Ingresos Calculados:</strong> $${data.ingresos_calculados || '0'}</p> 
 
-            <p><strong>Identidad:</strong> Verificada y consistente.</p> 
-
-        `; 
-
-        document.getElementById('dash-alertas').innerHTML = ` 
-
-            <li>El certificado de ingresos vence en 15 días.</li> 
-
-            <li>Diferencia menor detectada entre cédula y contrato (nombres secundarios).</li> 
+            <p><strong>Identidad y Consistencia:</strong> Verificado.</p> 
 
         `; 
 
-    }, 2000); 
+        document.getElementById('dash-alertas').innerHTML = alertasHTML || '<li>No se detectaron alertas críticas.</li>'; 
+
+         
+
+        status.textContent = 'Dashboard financiero generado.'; 
+
+    } catch (error) { 
+
+        status.innerHTML = '<span class="text-red-500">Error procesando imágenes.</span>'; 
+
+    } finally { 
+
+        btn.disabled = false; btn.classList.remove('opacity-50'); 
+
+    } 
 
 } 

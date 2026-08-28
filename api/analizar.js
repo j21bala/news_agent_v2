@@ -1,34 +1,103 @@
-// api/analizar.js
-const axios = require('axios');
+const axios = require('axios'); 
 
-module.exports = async (req, res) => {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
+ 
 
-  const { articulo, link } = req.body;
-  const GROQ_KEY = process.env.GROQ_API_KEY;
-  const TAVILY_KEY = process.env.TAVILY_API_KEY;
+module.exports = async (req, res) => { 
 
-  try {
-    // 1. Extraer entidades para minimizar el gasto de tokens en la búsqueda
-    const entityPrompt = `Extrae únicamente los nombres de personas y empresas clave del texto, separados por coma: "${articulo.substring(0, 1000)}"`;
-    const groqEntityRes = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
-      model: 'llama-3.3-70b-versatile',
-      messages: [{ role: 'user', content: entityPrompt }]
-    }, { headers: { Authorization: `Bearer ${GROQ_KEY}` } });
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' }); 
 
-    const entidades = groqEntityRes.data.choices[0].message.content;
+ 
 
-    // 2. Búsqueda web dirigida con Tavily
-    const tavilyRes = await axios.post('https://api.tavily.com/search', {
-      api_key: TAVILY_KEY,
-      query: entidades,
-      max_results: 3
-    });
+    const { articulos } = req.body; 
 
-    const fuentes = tavilyRes.data.results.map(r => ({ titulo: r.title, url: r.url, snippet: r.content }));
+    const GROQ_KEY = process.env.GROQ_API_KEY; 
 
-    return res.status(200).json({ entidades, fuentes, ok: true });
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
-};
+ 
+
+    if (!articulos || articulos.length === 0) { 
+
+        return res.status(400).json({ error: 'No se enviaron artículos' }); 
+
+    } 
+
+ 
+
+    const textosUnidos = articulos.join('\n\n---\n\n'); 
+
+ 
+
+    const prompt = ` 
+
+    Eres un analista senior de riesgo SARLAFT. Analiza la siguiente información y extrae los datos en formato JSON estrictamente. 
+
+     
+
+    ESTRUCTURA JSON OBLIGATORIA: 
+
+    { 
+
+      "riesgo_general": "Alto, Medio o Bajo", 
+
+      "resumen": "Resumen de los hechos y delitos (máximo 5 líneas)", 
+
+      "involucrados": [ 
+
+        { 
+
+          "nombre": "Nombre de la persona o empresa", 
+
+          "rol": "Delito o implicación", 
+
+          "estado": "Investigado, Detenido, Condenado, etc." 
+
+        } 
+
+      ] 
+
+    } 
+
+ 
+
+    Textos a analizar: 
+
+    ${textosUnidos} 
+
+    `; 
+
+ 
+
+    try { 
+
+        const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', { 
+
+            model: 'llama-3.3-70b-versatile', 
+
+            messages: [{ role: 'system', content: prompt }], 
+
+            response_format: { type: "json_object" }, 
+
+            temperature: 0.2 
+
+        }, { 
+
+            headers: { Authorization: `Bearer ${GROQ_KEY}` }, 
+
+            timeout: 25000 // Evitar timeouts en Vercel 
+
+        }); 
+
+ 
+
+        const data = JSON.parse(response.data.choices[0].message.content); 
+
+        return res.status(200).json(data); 
+
+    } catch (error) { 
+
+        console.error(error); 
+
+        return res.status(500).json({ error: 'Error procesando la noticia con la IA.' }); 
+
+    } 
+
+}; 
