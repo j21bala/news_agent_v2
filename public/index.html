@@ -1,62 +1,105 @@
-<div
-  id="chat-panel"
-  class="panel no-print"
-  style="display: none; margin-top: 20px; border-left: 4px solid var(--teal)"
->
-  <div class="informe-header">
-    <h2>Asistente Investigativo</h2>
-    <p>
-      Haz consultas específicas sobre los involucrados o los hechos documentados
-      en esta noticia.
-    </p>
-  </div>
-  <div
-    id="chat-historial"
-    style="
-      max-height: 250px;
-      overflow-y: auto;
-      margin-bottom: 15px;
-      font-size: 13px;
-    "
-  ></div>
+<!DOCTYPE html> 
+<html lang="es"> 
+<head> 
+<meta charset="UTF-8"> 
+<meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+<title>Plataforma SARLAFT y ROS</title> 
+<!-- Ruta corregida apuntando a la subcarpeta css --> 
+<link rel="stylesheet" href="./css/styles.css"> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script> 
+</head> 
+<body> 
+<div class="wrap"> 
+<h1 class="no-print">Generador de Informes SARLAFT y ROS</h1> 
+<div class="sub no-print">Análisis de riesgo en noticias y generación de Reportes de Operaciones Sospechosas.</div> 
+ 
+<!-- PANEL 1: NOTICIAS --> 
+<div class="panel no-print" id="inputPanel"> 
+   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"> 
+     <label style="margin:0;font-size:14px;font-weight:700;">Noticias a analizar</label> 
+     <button onclick="agregarNoticia()" style="padding:7px 14px;font-size:12px;">+ Agregar noticia</button> 
+   </div> 
+   <div id="noticias-container"></div> 
+   <div style="margin-top:16px;"> 
+     <button id="btnAnalizar" onclick="analizarTodas()">Analizar con IA</button> 
+     <span id="status" style="font-size:12px;color:var(--gray);margin-left:10px;"></span> 
+   </div> 
+</div> 
+ 
+<!-- PANEL 2: ROS (NUEVO) --> 
+<div class="panel no-print" id="rosPanel" style="margin-top: 20px; border-left: 4px solid var(--gold);"> 
+   <h2>Generador de Informes ROS (Comité)</h2> 
+   <label>Plantilla o Indicaciones</label> 
+   <textarea id="rosPlantilla" placeholder="Ej. 1. Resumen Ejecutivo, 2. Antecedentes..."></textarea> 
+   <label>Texto de Documentos Adjuntos (PDF, Excel, Word)</label> 
+   <textarea id="rosDocumentos" placeholder="Pega el contenido de las fuentes documentales..."></textarea> 
+   <button onclick="generarInformeROS()" class="gold">Generar Informe ROS Imparcial</button> 
+   <span id="rosStatus" style="font-size: 12px; margin-left: 10px; color: var(--gray);"></span> 
+</div> 
+ 
+<!-- PANEL 3: RESULTADOS ROS --> 
+<div id="rosResultadoPanel" class="panel" style="display:none; margin-top: 20px;"> 
+   <h3>Informe ROS Generado</h3> 
+   <div id="rosMotorBadge" style="font-size: 11px; color: var(--teal); margin-bottom: 10px;"></div> 
+   <pre id="rosContenido" style="white-space: pre-wrap; font-family: inherit; line-height: 1.6;"></pre> 
+</div> 
+ 
+<!-- PANEL 4: RESULTADOS NOTICIAS (REPORTE) --> 
+<div id="report" style="display:none;"> 
+   <div class="informe-header"> 
+     <h2>Informe de Riesgo SARLAFT</h2> 
+     <p>Objetivo: identificar y evaluar el riesgo de lavado de activos asociado a las personas naturales mencionadas en las noticias.</p> 
+   </div> 
+   <div id="reportes-container"></div> 
+   <div class="btn-group no-print"> 
+     <button class="secondary" onclick="volver()">← Editar / volver</button> 
+     <button class="gold" id="btnExportar" onclick="window.print()">📄 Generar PDF</button> 
+   </div> 
+</div> 
+ 
+<!-- PANEL 5: CHAT ASISTENTE (NUEVO) --> 
+<div id="chat-panel" class="panel no-print" style="margin-top: 20px; border-left: 4px solid var(--teal);"> 
+   <div class="informe-header"> 
+       <h2>Asistente Investigativo</h2> 
+   </div> 
+   <div id="chat-historial" style="max-height: 250px; overflow-y: auto; margin-bottom: 15px; font-size: 13px; background: #fafbfc; padding: 10px; border-radius: 8px;"></div> 
+   <div style="display: flex; gap: 10px;"> 
+       <input type="text" id="chat-input" placeholder="Haz preguntas sobre el análisis..." style="margin-bottom:0;"> 
+       <button onclick="enviarPregunta()" class="secondary">Consultar</button> 
+   </div> 
+</div> 
+ 
+</div> 
+<!-- Ruta corregida apuntando a la subcarpeta js --> 
+<script src="./js/app.js"></script> 
+</body> 
+</html> 
 
-  <div class="panel no-print" id="rosPanel" style="margin-top: 20px">
-    <h2>Generador de Informes ROS (Comité y Gerencia)</h2>
-    <div class="sub">
-      Generación de informes de operaciones sospechosas imparciales y basados en
-      evidencia.
-    </div>
-    <label>Plantilla o Indicaciones de la Gerencia</label>
-    <textarea
-      id="rosPlantilla"
-      placeholder="Ej. 1. Resumen Ejecutivo, 2. Antecedentes del Cliente, 3. Inconsistencias Financieras, 4. Conclusión Técnica..."
-    ></textarea>
-    <label>Texto de Documentos / Adjuntos (PDF, Excel, Cartas)</label>
-    <textarea
-      id="rosDocumentos"
-      placeholder="Pega aquí el contenido extraído de las fuentes documentales..."
-    ></textarea>
-    <button onclick="generarInformeROS()" class="gold">
-      Generar Informe ROS Imparcial
-    </button>
-    <span
-      id="rosStatus"
-      style="font-size: 12px; margin-left: 10px; color: var(--gray)"
-    ></span>
-  </div>
-  <div
-    id="rosResultadoPanel"
-    class="panel"
-    style="display: none; margin-top: 20px"
-  >
-    <h3>Informe ROS Generado</h3>
-    <div
-      id="rosMotorBadge"
-      style="font-size: 11px; color: var(--teal); margin-bottom: 10px"
-    ></div>
-    <pre
-      id="rosContenido"
-      style="white-space: pre-wrap; font-family: inherit; line-height: 1.6"
-    ></pre>
-  </div>
-</div>
+ 
+
+let noticiaCount = 0; 
+let reportes = []; 
+ 
+window.onload = function () { 
+    agregarNoticia(); 
+}; 
+ 
+function agregarNoticia() { 
+    noticiaCount++; 
+    const container = document.getElementById('noticias-container'); 
+    const div = document.createElement('div'); 
+    div.className = 'noticia-item'; 
+    div.id = `noticia-${noticiaCount}`; 
+    div.innerHTML = ` 
+        <label>Link de la noticia</label> 
+        <input type="text" id="link-${noticiaCount}" placeholder="https://..."> 
+        <label>Texto completo de la noticia</label> 
+        <textarea id="articulo-${noticiaCount}" placeholder="Pega aquí el contenido..."></textarea> 
+    `; 
+    container.appendChild(div); 
+} 
+ 
+// Aquí integraremos las llamadas al backend (fetch a /api/analizar, /api/generar-ros, etc.) 
+function analizarTodas() { alert("Función de análisis conectada al backend en construcción."); } 
+function generarInformeROS() { alert("Función ROS conectada al backend en construcción."); } 
+function enviarPregunta() { alert("Función de Chat conectada al backend en construcción."); } 
