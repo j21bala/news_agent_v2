@@ -1,105 +1,157 @@
 <!DOCTYPE html> 
 <html lang="es"> 
 <head> 
-<meta charset="UTF-8"> 
-<meta name="viewport" content="width=device-width, initial-scale=1.0"> 
-<title>Plataforma SARLAFT y ROS</title> 
-<!-- Ruta corregida apuntando a la subcarpeta css --> 
-<link rel="stylesheet" href="./css/styles.css"> 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script> 
+    <meta charset="UTF-8"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <title>Plataforma de Inteligencia SARLAFT</title> 
+    <script src="https://cdn.tailwindcss.com"></script> 
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet"> 
+    <script> 
+        tailwind.config = { 
+            theme: { 
+                extend: { 
+                    colors: { 
+                        navy: '#0f1b2d', 
+                        gold: '#c9a227', 
+                        teal: '#1b7a72' 
+                    }, 
+                    fontFamily: { sans: ['Inter', 'sans-serif'] } 
+                } 
+            } 
+        } 
+    </script> 
+    <style> 
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap'); 
+        .fade-in { animation: fadeIn 0.4s ease-in-out; } 
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } } 
+        /* Oculta los scrollbars feos pero permite hacer scroll */ 
+        ::-webkit-scrollbar { width: 6px; } 
+        ::-webkit-scrollbar-track { background: transparent; } 
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; } 
+    </style> 
 </head> 
-<body> 
-<div class="wrap"> 
-<h1 class="no-print">Generador de Informes SARLAFT y ROS</h1> 
-<div class="sub no-print">Análisis de riesgo en noticias y generación de Reportes de Operaciones Sospechosas.</div> 
+<body class="bg-navy text-slate-100 font-sans min-h-screen selection:bg-teal selection:text-white"> 
  
-<!-- PANEL 1: NOTICIAS --> 
-<div class="panel no-print" id="inputPanel"> 
-   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"> 
-     <label style="margin:0;font-size:14px;font-weight:700;">Noticias a analizar</label> 
-     <button onclick="agregarNoticia()" style="padding:7px 14px;font-size:12px;">+ Agregar noticia</button> 
-   </div> 
-   <div id="noticias-container"></div> 
-   <div style="margin-top:16px;"> 
-     <button id="btnAnalizar" onclick="analizarTodas()">Analizar con IA</button> 
-     <span id="status" style="font-size:12px;color:var(--gray);margin-left:10px;"></span> 
-   </div> 
-</div> 
+    <!-- ================= MENÚ PRINCIPAL (LANDING) ================= --> 
+    <div id="view-menu" class="min-h-screen flex flex-col items-center justify-center p-6 fade-in"> 
+        <div class="text-center mb-16"> 
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-teal/20 text-teal mb-6"> 
+                <i class="fa-solid fa-shield-halved text-3xl"></i> 
+            </div> 
+            <h1 class="text-4xl md:text-5xl font-800 tracking-tight mb-4 text-transparent bg-clip-text bg-gradient-to-r from-teal to-blue-400"> 
+                Inteligencia SARLAFT 
+            </h1> 
+            <p class="text-slate-400 max-w-2xl mx-auto text-lg">Plataforma centralizada para análisis de riesgo, debida diligencia corporativa y generación automatizada de informes directivos.</p> 
+        </div> 
  
-<!-- PANEL 2: ROS (NUEVO) --> 
-<div class="panel no-print" id="rosPanel" style="margin-top: 20px; border-left: 4px solid var(--gold);"> 
-   <h2>Generador de Informes ROS (Comité)</h2> 
-   <label>Plantilla o Indicaciones</label> 
-   <textarea id="rosPlantilla" placeholder="Ej. 1. Resumen Ejecutivo, 2. Antecedentes..."></textarea> 
-   <label>Texto de Documentos Adjuntos (PDF, Excel, Word)</label> 
-   <textarea id="rosDocumentos" placeholder="Pega el contenido de las fuentes documentales..."></textarea> 
-   <button onclick="generarInformeROS()" class="gold">Generar Informe ROS Imparcial</button> 
-   <span id="rosStatus" style="font-size: 12px; margin-left: 10px; color: var(--gray);"></span> 
-</div> 
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl w-full px-4"> 
+            <!-- Tarjeta 1: Noticias --> 
+            <button onclick="navegarA('view-noticias')" class="group text-left bg-slate-800/50 border border-slate-700 hover:border-teal rounded-2xl p-8 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_10px_40px_-10px_rgba(27,122,114,0.4)] relative overflow-hidden"> 
+                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><i class="fa-regular fa-newspaper text-6xl"></i></div> 
+                <div class="w-12 h-12 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center mb-6 text-xl"><i class="fa-solid fa-magnifying-glass"></i></div> 
+                <h3 class="text-xl font-bold text-white mb-2">Análisis de Noticias</h3> 
+                <p class="text-slate-400 text-sm leading-relaxed">Extracción de entidades y perfilamiento de riesgo basado en medios de comunicación con soporte de IA e investigación en red.</p> 
+            </button> 
  
-<!-- PANEL 3: RESULTADOS ROS --> 
-<div id="rosResultadoPanel" class="panel" style="display:none; margin-top: 20px;"> 
-   <h3>Informe ROS Generado</h3> 
-   <div id="rosMotorBadge" style="font-size: 11px; color: var(--teal); margin-bottom: 10px;"></div> 
-   <pre id="rosContenido" style="white-space: pre-wrap; font-family: inherit; line-height: 1.6;"></pre> 
-</div> 
+            <!-- Tarjeta 2: ROS --> 
+            <button onclick="navegarA('view-ros')" class="group text-left bg-slate-800/50 border border-slate-700 hover:border-gold rounded-2xl p-8 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_10px_40px_-10px_rgba(201,162,39,0.4)] relative overflow-hidden"> 
+                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><i class="fa-solid fa-file-invoice text-6xl"></i></div> 
+                <div class="w-12 h-12 rounded-lg bg-gold/20 text-gold flex items-center justify-center mb-6 text-xl"><i class="fa-solid fa-gavel"></i></div> 
+                <h3 class="text-xl font-bold text-white mb-2">Generador ROS</h3> 
+                <p class="text-slate-400 text-sm leading-relaxed">Creación de Reportes de Operaciones Sospechosas. Carga de archivos múltiples (PDF/Excel) para análisis objetivo del comité.</p> 
+            </button> 
  
-<!-- PANEL 4: RESULTADOS NOTICIAS (REPORTE) --> 
-<div id="report" style="display:none;"> 
-   <div class="informe-header"> 
-     <h2>Informe de Riesgo SARLAFT</h2> 
-     <p>Objetivo: identificar y evaluar el riesgo de lavado de activos asociado a las personas naturales mencionadas en las noticias.</p> 
-   </div> 
-   <div id="reportes-container"></div> 
-   <div class="btn-group no-print"> 
-     <button class="secondary" onclick="volver()">← Editar / volver</button> 
-     <button class="gold" id="btnExportar" onclick="window.print()">📄 Generar PDF</button> 
-   </div> 
-</div> 
+            <!-- Tarjeta 3: Dashboard Cliente --> 
+            <button onclick="navegarA('view-cliente')" class="group text-left bg-slate-800/50 border border-slate-700 hover:border-purple-500 rounded-2xl p-8 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_10px_40px_-10px_rgba(168,85,247,0.4)] relative overflow-hidden"> 
+                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><i class="fa-solid fa-chart-pie text-6xl"></i></div> 
+                <div class="w-12 h-12 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center mb-6 text-xl"><i class="fa-solid fa-id-card"></i></div> 
+                <h3 class="text-xl font-bold text-white mb-2">Cruce Masivo Cliente</h3> 
+                <p class="text-slate-400 text-sm leading-relaxed">Análisis multimodal. Sube evidencias gráficas (documentos, certificaciones) para generar un dashboard financiero instantáneo.</p> 
+            </button> 
+        </div> 
+    </div> 
  
-<!-- PANEL 5: CHAT ASISTENTE (NUEVO) --> 
-<div id="chat-panel" class="panel no-print" style="margin-top: 20px; border-left: 4px solid var(--teal);"> 
-   <div class="informe-header"> 
-       <h2>Asistente Investigativo</h2> 
-   </div> 
-   <div id="chat-historial" style="max-height: 250px; overflow-y: auto; margin-bottom: 15px; font-size: 13px; background: #fafbfc; padding: 10px; border-radius: 8px;"></div> 
-   <div style="display: flex; gap: 10px;"> 
-       <input type="text" id="chat-input" placeholder="Haz preguntas sobre el análisis..." style="margin-bottom:0;"> 
-       <button onclick="enviarPregunta()" class="secondary">Consultar</button> 
-   </div> 
-</div> 
+    <!-- ================= CONTENEDORES DE LAS HERRAMIENTAS (Ocultos por defecto) ================= --> 
+     
+    <!-- 1. Vista Noticias --> 
+    <div id="view-noticias" class="hidden min-h-screen bg-slate-50 text-slate-900 fade-in pb-20"> 
+        <!-- Barra de navegación interna --> 
+        <div class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50"> 
+            <h2 class="text-lg font-bold text-navy"><i class="fa-solid fa-newspaper text-teal mr-2"></i> Análisis de Noticias</h2> 
+            <button onclick="navegarA('view-menu')" class="text-sm font-semibold text-slate-500 hover:text-navy"><i class="fa-solid fa-arrow-left mr-1"></i> Volver al menú</button> 
+        </div> 
+        <div class="max-w-7xl mx-auto p-6 mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6"> 
+            <div class="lg:col-span-2"> 
+                <h3 class="text-2xl font-bold mb-4">Módulo en construcción</h3> 
+                <p>Aquí irá el formulario para pegar noticias y el reporte generado.</p> 
+            </div> 
+            <!-- Chat lateral implementado correctamente --> 
+            <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm h-[600px] flex flex-col"> 
+                <h3 class="font-bold text-navy mb-4 border-b pb-2"><i class="fa-solid fa-robot text-teal mr-2"></i> Asistente Investigativo</h3> 
+                <div id="chat-historial" class="flex-1 overflow-y-auto bg-slate-50 rounded p-4 mb-4 text-sm border border-slate-100"> 
+                    <div class="text-slate-500 italic text-center mt-20">El chat se activará tras analizar una noticia.</div> 
+                </div> 
+                <div class="flex gap-2"> 
+                    <input type="text" class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal" placeholder="Haz una consulta..."> 
+                    <button class="bg-navy hover:bg-slate-800 text-white px-4 rounded-lg"><i class="fa-solid fa-paper-plane"></i></button> 
+                </div> 
+            </div> 
+        </div> 
+    </div> 
  
-</div> 
-<!-- Ruta corregida apuntando a la subcarpeta js --> 
-<script src="./js/app.js"></script> 
+    <!-- 2. Vista ROS (Con zonas de carga de archivos reales) --> 
+    <div id="view-ros" class="hidden min-h-screen bg-slate-50 text-slate-900 fade-in pb-20"> 
+        <div class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50"> 
+            <h2 class="text-lg font-bold text-navy"><i class="fa-solid fa-gavel text-gold mr-2"></i> Generador ROS</h2> 
+            <button onclick="navegarA('view-menu')" class="text-sm font-semibold text-slate-500 hover:text-navy"><i class="fa-solid fa-arrow-left mr-1"></i> Volver al menú</button> 
+        </div> 
+        <div class="max-w-4xl mx-auto p-6 mt-6"> 
+            <div class="bg-white border border-slate-200 rounded-xl p-8 shadow-sm"> 
+                <h3 class="text-xl font-bold mb-6 border-b pb-4">Documentación Base para el Comité</h3> 
+                 
+                <!-- Zona Upload Plantilla --> 
+                <div class="mb-6"> 
+                    <label class="block font-semibold text-sm mb-2 text-navy">1. Cargar Plantilla Base (.docx, .pdf)</label> 
+                    <div class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:bg-slate-50 hover:border-gold transition-colors cursor-pointer"> 
+                        <i class="fa-solid fa-file-arrow-up text-3xl text-slate-400 mb-3"></i> 
+                        <p class="text-sm text-slate-500">Arrastra tu plantilla aquí o haz clic para subir</p> 
+                        <input type="file" class="hidden" accept=".pdf,.doc,.docx"> 
+                    </div> 
+                </div> 
+ 
+                <!-- Zona Upload Evidencias --> 
+                <div class="mb-8"> 
+                    <label class="block font-semibold text-sm mb-2 text-navy">2. Cargar Evidencias / Expedientes (Múltiples archivos)</label> 
+                    <div class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:bg-slate-50 hover:border-gold transition-colors cursor-pointer"> 
+                        <i class="fa-solid fa-folder-open text-3xl text-slate-400 mb-3"></i> 
+                        <p class="text-sm text-slate-500">Sube Excels, PDFs, correos o reportes financieros</p> 
+                        <input type="file" multiple class="hidden"> 
+                    </div> 
+                </div> 
+                 
+                <button class="w-full bg-navy hover:bg-slate-800 text-white font-bold py-3 rounded-xl transition-all shadow-md">Analizar Evidencia y Generar ROS</button> 
+            </div> 
+        </div> 
+    </div> 
+ 
+    <!-- 3. Vista Dashboard Cliente --> 
+    <div id="view-cliente" class="hidden min-h-screen bg-slate-50 text-slate-900 fade-in pb-20"> 
+        <div class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50"> 
+            <h2 class="text-lg font-bold text-navy"><i class="fa-solid fa-chart-pie text-purple-600 mr-2"></i> Dashboard de Cruce Masivo</h2> 
+            <button onclick="navegarA('view-menu')" class="text-sm font-semibold text-slate-500 hover:text-navy"><i class="fa-solid fa-arrow-left mr-1"></i> Volver al menú</button> 
+        </div> 
+        <div class="max-w-5xl mx-auto p-6 mt-6"> 
+            <div class="bg-white border border-slate-200 rounded-xl p-8 shadow-sm text-center"> 
+                <i class="fa-solid fa-images text-5xl text-purple-200 mb-4"></i> 
+                <h3 class="text-2xl font-bold mb-2">Carga de Imágenes Documentales</h3> 
+                <p class="text-slate-500 mb-6">Sube los documentos del cliente (Cédula, Estados Financieros, Certificados) para generar las gráficas de riesgo.</p> 
+                <div class="border-2 border-dashed border-purple-200 bg-purple-50 rounded-xl p-10 cursor-pointer hover:border-purple-400 transition-colors"> 
+                    <span class="text-purple-600 font-semibold">Seleccionar hasta 6 imágenes</span> 
+                </div> 
+            </div> 
+        </div> 
+    </div> 
+ 
+    <script src="./js/app.js"></script> 
 </body> 
 </html> 
-
- 
-
-let noticiaCount = 0; 
-let reportes = []; 
- 
-window.onload = function () { 
-    agregarNoticia(); 
-}; 
- 
-function agregarNoticia() { 
-    noticiaCount++; 
-    const container = document.getElementById('noticias-container'); 
-    const div = document.createElement('div'); 
-    div.className = 'noticia-item'; 
-    div.id = `noticia-${noticiaCount}`; 
-    div.innerHTML = ` 
-        <label>Link de la noticia</label> 
-        <input type="text" id="link-${noticiaCount}" placeholder="https://..."> 
-        <label>Texto completo de la noticia</label> 
-        <textarea id="articulo-${noticiaCount}" placeholder="Pega aquí el contenido..."></textarea> 
-    `; 
-    container.appendChild(div); 
-} 
- 
-// Aquí integraremos las llamadas al backend (fetch a /api/analizar, /api/generar-ros, etc.) 
-function analizarTodas() { alert("Función de análisis conectada al backend en construcción."); } 
-function generarInformeROS() { alert("Función ROS conectada al backend en construcción."); } 
-function enviarPregunta() { alert("Función de Chat conectada al backend en construcción."); } 
