@@ -7,13 +7,11 @@ module.exports = async (req, res) => {
 
     if (!GROQ_KEY) return res.status(500).json({ error: 'Falta API Key de Groq' });
 
-    // 1. Si hay enlaces o textos, usamos Tavily para buscar contexto web profundo si es necesario
     let contextoWeb = "";
     let urlsEncontradas = [];
 
     if (articulos && articulos.length > 0) {
-        // Extraer posibles términos o links para buscar en Tavily
-        const queryBusqueda = articulos[0].substring(0, 150); // Usar texto inicial como query
+        const queryBusqueda = articulos[0].substring(0, 150);
         
         if (TAVILY_KEY) {
             try {
@@ -41,14 +39,13 @@ module.exports = async (req, res) => {
 
     const textoLocal = (articulos || []).join('\n\n---\n\n');
 
-    // 2. Prompt estricto para generar el informe corporativo completo y riguroso SARLAFT
     const prompt = `
-    Eres un oficial de cumplimiento y analista senior de riesgo SARLAFT de una entidad financiera.
-    Analiza la información provista (y el contexto web de investigación) para generar un INFORME DE RIESGO SARLAFT exhaustivo, profesional y formal.
+    Eres un oficial de cumplimiento y analista senior de riesgo SARLAFT. Analiza la información provista y el contexto de investigación web.
+    Genera un INFORME DE RIESGO SARLAFT exhaustivo, profesional y formal.
     
-    Responde ÚNICA Y EXCLUSIVAMENTE con un objeto JSON válido que contenga exactamente esta estructura:
+    Responde ÚNICA Y EXCLUSIVAMENTE con un objeto JSON válido que contenga esta estructura exacta:
     {
-      "sujeto_nombre": "Nombre completo del personaje o empresa investigada",
+      "sujeto_nombre": "Nombre completo de la persona o empresa investigada",
       "sujeto_perfil": "Breve descripción de su rol (ej: narcotraficante, empresario, etc.)",
       "riesgo_general": "Alto",
       "hechos_clave": [
@@ -56,7 +53,7 @@ module.exports = async (req, res) => {
         "Hecho clave 2 detallado",
         "Hecho clave 3 detallado"
       ],
-      "analisis_riesgo": "Análisis legal, financiero y operativo detallado del riesgo de lavado de activos y financiación del terrorismo.",
+      "analisis_riesgo": "Análisis legal, financiero y operativo detallado del riesgo de lavado de activos.",
       "porque_este_nivel": "Justificación clara de por qué se asigna este nivel de riesgo.",
       "tipo_id": "CC, NIT o CE",
       "numero_id": "Número de identificación detectado o estimado",
@@ -86,7 +83,7 @@ module.exports = async (req, res) => {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
+                model: 'openai/gpt-oss-120b',
                 messages: [{ role: 'system', content: prompt }],
                 response_format: { type: "json_object" },
                 temperature: 0.1
@@ -98,7 +95,6 @@ module.exports = async (req, res) => {
 
         const jsonRespuesta = JSON.parse(data.choices[0].message.content);
         
-        // Asegurar que las fuentes incluyan las de Tavily si las hay
         if (urlsEncontradas.length > 0) {
             jsonRespuesta.fuentes = [...new Set([...(jsonRespuesta.fuentes || []), ...urlsEncontradas])];
         }

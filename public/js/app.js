@@ -1,31 +1,11 @@
-// ==========================================
-// 1. NAVEGACIÓN SPA (Global e Inmediata)
-// ==========================================
-function navegarA(idVista) {
-    const vistas = ['view-menu', 'view-noticias', 'view-ros', 'view-cliente'];
-    vistas.forEach(vista => {
-        const el = document.getElementById(vista);
-        if (el) el.classList.add('hidden');
-    });
-
-    const destino = document.getElementById(idVista);
-    if (destino) {
-        destino.classList.remove('hidden');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-}
-
-// ==========================================
-// 2. MÓDULO: NOTICIAS & CHAT ASISTENTE
-// ==========================================
 let noticiaCount = 0;
 let contextoReporteActual = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-    agregarNoticia();
+    window.agregarNoticia();
 });
 
-function agregarNoticia() {
+window.agregarNoticia = function() {
     noticiaCount++;
     const container = document.getElementById('noticias-container');
     if (!container) return;
@@ -35,20 +15,20 @@ function agregarNoticia() {
     div.id = `noticia-${noticiaCount}`;
     div.innerHTML = `
         <div class="flex justify-between items-center mb-2">
-            <span class="font-bold text-sm text-navy">Noticia ${noticiaCount}</span>
-            ${noticiaCount > 1 ? `<button onclick="eliminarNoticia(${noticiaCount})" class="text-red-500 text-xs hover:underline"><i class="fa-solid fa-trash"></i> Quitar</button>` : ''}
+            <span class="font-bold text-sm text-navy">Fuente ${noticiaCount}</span>
+            ${noticiaCount > 1 ? `<button onclick="window.eliminarNoticia(${noticiaCount})" class="text-red-500 text-xs hover:underline"><i class="fa-solid fa-trash"></i> Quitar</button>` : ''}
         </div>
         <input type="text" id="link-${noticiaCount}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm mb-2 focus:outline-none focus:border-teal" placeholder="Enlace web (opcional)">
-        <textarea id="articulo-${noticiaCount}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm h-24 focus:outline-none focus:border-teal" placeholder="Pega el texto de la noticia aquí..."></textarea>
+        <textarea id="articulo-${noticiaCount}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm h-24 focus:outline-none focus:border-teal" placeholder="Pega el contenido de la noticia o los datos del sujeto..."></textarea>
     `;
     container.appendChild(div);
-}
+};
 
-function eliminarNoticia(id) {
+window.eliminarNoticia = function(id) {
     document.getElementById(`noticia-${id}`)?.remove();
-}
+};
 
-async function analizarNoticias() {
+window.analizarNoticias = async function() {
     const btn = document.getElementById('btnAnalizarNoticias');
     const status = document.getElementById('status-noticias');
     
@@ -64,7 +44,7 @@ async function analizarNoticias() {
     }
 
     btn.disabled = true; btn.classList.add('opacity-50');
-    status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-teal"></i> Investigando en la web (Tavily) y analizando con IA...';
+    status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-teal"></i> Investigando en la web (Tavily) y generando informe gerencial...';
 
     try {
         const res = await fetch('/api/analizar', {
@@ -82,6 +62,7 @@ async function analizarNoticias() {
         let hechosHTML = (data.hechos_clave || []).map(h => `<li class="mb-1">${h}</li>`).join('');
         let fuentesHTML = (data.fuentes || []).map(f => `<li class="truncate"><a href="${f}" target="_blank" class="text-blue-600 hover:underline">${f}</a></li>`).join('');
 
+        // Renderizado del informe gerencial ejecutivo con tabla SARLAFT completa
         document.getElementById('contenido-noticias').innerHTML = `
             <div class="border-b pb-4 mb-4 flex justify-between items-start">
                 <div>
@@ -120,7 +101,7 @@ async function analizarNoticias() {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr class="bg-white">
+                        <tr class="bg-white text-slate-800">
                             <td class="p-2 border font-semibold">${data.tipo_id || 'CC'}</td>
                             <td class="p-2 border">${data.numero_id || 'N/A'}</td>
                             <td class="p-2 border">${data.cliente_bcs || 'No'}</td>
@@ -152,9 +133,9 @@ async function analizarNoticias() {
     } finally {
         btn.disabled = false; btn.classList.remove('opacity-50');
     }
-}
+};
 
-async function enviarPregunta() {
+window.enviarPregunta = async function() {
     const input = document.getElementById('chat-input');
     const pregunta = input.value.trim();
     if (!pregunta) return;
@@ -181,18 +162,18 @@ async function enviarPregunta() {
         document.getElementById(idTemp).outerHTML = `<div class="self-start bg-red-100 text-red-600 px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2">Error de conexión con el asistente.</div>`;
     }
     historial.scrollTop = historial.scrollHeight;
-}
+};
 
-function mostrarArchivos(inputId, listaId) {
+window.mostrarArchivos = function(inputId, listaId) {
     const input = document.getElementById(inputId);
     const lista = document.getElementById(listaId);
     lista.innerHTML = '';
     Array.from(input.files).forEach(file => {
         lista.innerHTML += `<li><i class="fa-solid fa-file-lines text-slate-400 mr-2"></i> ${file.name}</li>`;
     });
-}
+};
 
-async function analizarROS() {
+window.analizarROS = async function() {
     const btn = document.getElementById('btnAnalizarRos');
     const status = document.getElementById('status-ros');
     const plantillaPrompt = document.getElementById('rosPlantilla').value.trim();
@@ -229,10 +210,10 @@ async function analizarROS() {
     } finally {
         btn.disabled = false; btn.classList.remove('opacity-50');
     }
-}
+};
 
 let imagenesBase64 = [];
-function mostrarPreviewImagenes() {
+window.mostrarPreviewImagenes = function() {
     const input = document.getElementById('clienteImagenes');
     const preview = document.getElementById('preview-imagenes');
     preview.innerHTML = '';
@@ -248,9 +229,9 @@ function mostrarPreviewImagenes() {
         };
         reader.readAsDataURL(file);
     });
-}
+};
 
-async function analizarCliente() {
+window.analizarCliente = async function() {
     const btn = document.getElementById('btnAnalizarCliente');
     const status = document.getElementById('status-cliente');
     
@@ -281,9 +262,9 @@ async function analizarCliente() {
     } finally {
         btn.disabled = false; btn.classList.remove('opacity-50');
     }
-}
+};
 
-function exportarExcel(tipo) {
+window.exportarExcel = function(tipo) {
     if (tipo === 'noticias' && contextoReporteActual) {
         const ws = XLSX.utils.json_to_sheet([contextoReporteActual]);
         const wb = XLSX.utils.book_new();
@@ -292,4 +273,4 @@ function exportarExcel(tipo) {
     } else {
         alert("No hay datos para exportar.");
     }
-}
+};
