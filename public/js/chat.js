@@ -1,4 +1,3 @@
-
 async function enviarPregunta() {
     const input = document.getElementById('chat-input');
     const pregunta = input.value.trim();
@@ -19,7 +18,10 @@ async function enviarPregunta() {
         });
         
         const data = await res.json();
-        historial.innerHTML += `<div style="margin-bottom: 12px; color: var(--navy2);"><strong>IA:</strong> ${data.respuesta}</div>`;
+        const fuentesHTML = (data.fuentes && data.fuentes.length)
+            ? `<div style="margin-top:4px; font-size: 10px; color: #94a3b8;">Fuentes consultadas: ${data.fuentes.map(f => `<a href="${f}" target="_blank" rel="noopener" style="text-decoration:underline;">${f}</a>`).join(' · ')}</div>`
+            : '';
+        historial.innerHTML += `<div style="margin-bottom: 12px; color: var(--navy2);"><strong>IA:</strong> ${data.respuesta}${fuentesHTML}</div>`;
         historial.scrollTop = historial.scrollHeight;
     } catch (e) {
         historial.innerHTML += `<div style="color: red;">Error al consultar la IA.</div>`;

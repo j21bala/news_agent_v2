@@ -92,7 +92,7 @@ window.analizarTodas = async function() {
             const res = await fetch('/api/analizar', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ articulos: [noticias[i].texto] })
+                body: JSON.stringify({ articulos: [noticias[i].texto], link: noticias[i].link })
             });
             if (!res.ok) throw new Error("Error en el servidor");
             const result = await res.json();
@@ -366,7 +366,10 @@ window.enviarPregunta = async function() {
             body: JSON.stringify({ pregunta, contexto: contextoReporteActual })
         });
         const data = await res.json();
-        document.getElementById(idTemp).outerHTML = `<div class="self-start bg-white border border-slate-200 text-navy px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm">${data.respuesta}</div>`;
+        const fuentesHTML = (data.fuentes && data.fuentes.length)
+            ? `<div class="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-400">Fuentes consultadas: ${data.fuentes.map(f => `<a href="${f}" target="_blank" rel="noopener" class="underline hover:text-teal">${f}</a>`).join(' · ')}</div>`
+            : '';
+        document.getElementById(idTemp).outerHTML = `<div class="self-start bg-white border border-slate-200 text-navy px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm">${data.respuesta}${fuentesHTML}</div>`;
     } catch (error) {
         document.getElementById(idTemp).outerHTML = `<div class="self-start bg-red-50 text-red-600 px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm">Error de conexión.</div>`;
     }
