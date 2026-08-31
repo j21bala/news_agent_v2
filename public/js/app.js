@@ -16,7 +16,10 @@ window.navegarA = function(idVista) {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-    if (document.getElementById('noticias-container')) window.agregarNoticia();
+    const container = document.getElementById('noticias-container');
+    if (container && container.children.length === 0) {
+        window.agregarNoticia();
+    }
 });
 
 window.agregarNoticia = function() {
@@ -24,8 +27,10 @@ window.agregarNoticia = function() {
     const id = noticiaCount;
     const container = document.getElementById('noticias-container');
     if (!container) return;
+
     const div = document.createElement('div');
-    div.className = 'bg-slate-50 border border-slate-200 rounded-lg p-5 mb-4';
+    // CLASE CLAVE: Añadido 'noticia-item' para que el selector la encuentre siempre
+    div.className = 'noticia-item bg-slate-50 border border-slate-200 rounded-lg p-5 mb-4';
     div.id = `noticia-${id}`;
     div.innerHTML = `
         <div class="flex justify-between items-center mb-3">
@@ -45,20 +50,38 @@ window.eliminarNoticia = function(id) {
 window.analizarTodas = async function() {
     const btn = document.getElementById('btnAnalizar');
     const status = document.getElementById('status');
+    
+    // Selector blindado que busca las cajas de noticias
     const items = document.querySelectorAll('.noticia-item');
-    if (items.length === 0) return alert('Agrega al menos una noticia.');
+    if (items.length === 0) {
+        alert('Agrega al menos una noticia.');
+        return;
+    }
 
     const noticias = [];
     let valido = true;
+
     items.forEach(item => {
         const id = item.id.replace('noticia-', '');
-        const link = document.getElementById(`link-${id}`)?.value.trim() || '';
-        const texto = document.getElementById(`articulo-${id}`)?.value.trim() || '';
-        if (!texto) { document.getElementById(`articulo-${id}`).classList.add('border-red-500'); valido = false; } 
-        else { document.getElementById(`articulo-${id}`).classList.remove('border-red-500'); }
-        noticias.push({ link, texto });
+        const linkEl = document.getElementById(`link-${id}`);
+        const textoEl = document.getElementById(`articulo-${id}`);
+        
+        const link = linkEl ? linkEl.value.trim() : '';
+        const texto = textoEl ? textoEl.value.trim() : '';
+
+        if (!texto) {
+            if (textoEl) textoEl.classList.add('border-red-500');
+            valido = false;
+        } else {
+            if (textoEl) textoEl.classList.remove('border-red-500');
+            noticias.push({ link, texto });
+        }
     });
-    if (!valido) return alert('Pega el texto en todas las fuentes.');
+
+    if (!valido || noticias.length === 0) {
+        alert('Por favor, completa el texto de la noticia en todas las fuentes agregadas.');
+        return;
+    }
 
     if (btn) { btn.disabled = true; btn.classList.add('opacity-50'); }
     reportes = [];
@@ -88,7 +111,6 @@ window.analizarTodas = async function() {
     
     contextoReporteActual = reportes[0];
     
-    // Cambiar a la vista del reporte y mostrar asistente flotante
     renderTodosReportes();
     window.navegarA('view-reporte');
     document.getElementById('asistente-flotante').classList.remove('hidden');
@@ -97,7 +119,7 @@ window.analizarTodas = async function() {
 window.volverNoticias = function() {
     window.navegarA('view-noticias');
     document.getElementById('asistente-flotante').classList.add('hidden');
-    document.getElementById('panel-chat').classList.add('hidden'); // Cerrar chat si estaba abierto
+    document.getElementById('panel-chat').classList.add('hidden');
 };
 
 window.toggleChat = function() {
@@ -111,9 +133,6 @@ window.toggleChat = function() {
     }
 };
 
-// ==========================================
-// RENDERIZADO IDÉNTICO A VERSIÓN 1 CON FORZADO DE COLOR PDF
-// ==========================================
 function renderTodosReportes() {
     const cont = document.getElementById('reportes-container');
     if (!cont) return;
@@ -140,7 +159,6 @@ function buildReporteHTML(data, ri) {
         med: '<i class="fa-solid fa-newspaper text-teal mr-1"></i>'
     };
     
-    // NOTA: Se inyecta style="-webkit-print-color-adjust: exact;" para forzar los colores en el PDF
     return `
     <div class="cover bg-navy text-white rounded-xl p-8 mb-6 shadow-md" style="-webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: #0f1b2d !important; color: white !important;">
         <h2 class="text-2xl font-extrabold mb-3">${data.titulo || '—'}</h2>
@@ -203,9 +221,9 @@ function filaTablaHTML(tipo, num, bcs, fid, prodbcs, prodfid, estado) {
 
 function buildPersonaHTML(p, ri, pi) {
     const nivelRaw = String(p.nivel_riesgo_sugerido || 'medio').toLowerCase().trim();
-    let badgeStyle = 'background-color: #b9770e !important; color: white !important;'; // Medio
-    if (nivelRaw === 'alto') badgeStyle = 'background-color: #b3261e !important; color: white !important;'; // Alto
-    if (nivelRaw === 'bajo') badgeStyle = 'background-color: #2e7d32 !important; color: white !important;'; // Bajo
+    let badgeStyle = 'background-color: #b9770e !important; color: white !important;';
+    if (nivelRaw === 'alto') badgeStyle = 'background-color: #b3261e !important; color: white !important;';
+    if (nivelRaw === 'bajo') badgeStyle = 'background-color: #2e7d32 !important; color: white !important;';
     
     return `
     <div class="persona-card bg-white border border-slate-200 rounded-xl p-6 mb-5 shadow-sm break-inside-avoid" id="persona-${ri}-${pi}" data-estado="${p.estado_proceso || 'Investigado'}">
@@ -242,7 +260,6 @@ function buildPersonaHTML(p, ri, pi) {
 
         <div class="recomendacion-box hidden mt-4 bg-amber-50 border-l-4 border-amber-500 p-4 rounded text-sm text-navy shadow-inner" id="recom-display-${ri}-${pi}" style="-webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: #fffbeb !important; border-left-color: #f59e0b !important;"></div>
 
-        <!-- Campos de edición exclusivos de pantalla (Desaparecen en PDF) -->
         <div class="edit-fields no-print bg-slate-50 p-5 rounded-lg border border-slate-200 mt-5 shadow-inner">
             <h4 class="font-bold text-xs text-navy mb-3 uppercase tracking-wider">Completar Debida Diligencia Manual</h4>
             <div class="grid grid-cols-2 gap-4 mb-3">
@@ -409,11 +426,8 @@ window.exportarPDF = function() {
     const tituloOriginal = document.title;
     document.title = (reportes[0]?.titulo || "Informe_SARLAFT").replace(/[^\w]/g, "_");
     
-    // Ocultar asistente al imprimir por seguridad adicional
     document.getElementById('asistente-flotante').classList.add('hidden');
-    
     window.print();
-    
     document.title = tituloOriginal;
     document.getElementById('asistente-flotante').classList.remove('hidden');
 };
