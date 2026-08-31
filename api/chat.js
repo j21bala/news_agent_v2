@@ -1,12 +1,10 @@
-lmodule.exports = async (req, res) => {
+module.exports = async (req, res) => {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
     const { pregunta, contexto } = req.body;
     const GROQ_KEY = process.env.GROQ_API_KEY;
 
-    if (!GROQ_KEY) {
-        return res.status(500).json({ error: 'Falta la API Key de Groq en Vercel.' });
-    }
+    if (!GROQ_KEY) return res.status(500).json({ error: 'Falta API Key' });
 
     const prompt = `
     Eres un asistente de auditoría SARLAFT. 
@@ -27,20 +25,22 @@ lmodule.exports = async (req, res) => {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
+                model: 'llama3-70b-8192', // <-- Modelo estable y garantizado
                 messages: [{ role: 'system', content: prompt }],
                 temperature: 0
             })
         });
 
         const data = await response.json();
-
+        
+        console.log("Status Chat Groq:", response.status);
         if (!response.ok) {
+            console.log("Error Groq:", data);
             return res.status(response.status).json({ error: 'Error de la IA', detalle: data });
         }
 
         return res.status(200).json({ respuesta: data.choices[0].message.content });
     } catch (error) {
-        return res.status(500).json({ error: 'Error de conexión con el asistente.' });
+        return res.status(500).json({ error: 'Error de conexión' });
     }
 };

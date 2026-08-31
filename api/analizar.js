@@ -4,14 +4,8 @@ module.exports = async (req, res) => {
     const { articulos } = req.body;
     const GROQ_KEY = process.env.GROQ_API_KEY;
 
-    // Validación de la llave
-    if (!GROQ_KEY) {
-        return res.status(500).json({ error: 'Falta la API Key de Groq en las variables de entorno de Vercel.' });
-    }
-
-    if (!articulos || articulos.length === 0) {
-        return res.status(400).json({ error: 'No se enviaron artículos' });
-    }
+    if (!GROQ_KEY) return res.status(500).json({ error: 'Falta API Key de Groq' });
+    if (!articulos || articulos.length === 0) return res.status(400).json({ error: 'Sin artículos' });
 
     const textosUnidos = articulos.join('\n\n---\n\n');
 
@@ -43,7 +37,7 @@ module.exports = async (req, res) => {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
+                model: 'llama3-70b-8192', // <-- Modelo estable y garantizado
                 messages: [{ role: 'system', content: prompt }],
                 response_format: { type: "json_object" },
                 temperature: 0.2
@@ -52,7 +46,10 @@ module.exports = async (req, res) => {
 
         const data = await response.json();
 
-        // Si Groq responde con un error, se lo enviamos al frontend para saber exactamente qué es
+        // Imprimir en consola de Vercel lo que responde Groq para monitoreo
+        console.log("Status de Groq:", response.status);
+        console.log("Respuesta de Groq:", JSON.stringify(data));
+
         if (!response.ok) {
             return res.status(response.status).json({ error: 'Error del motor de IA', detalle: data });
         }
@@ -60,6 +57,7 @@ module.exports = async (req, res) => {
         const jsonRespuesta = JSON.parse(data.choices[0].message.content);
         return res.status(200).json(jsonRespuesta);
     } catch (error) {
-        return res.status(500).json({ error: 'Fallo interno del servidor.', detalle: error.message });
+        console.error("Fallo interno:", error);
+        return res.status(500).json({ error: 'Fallo interno', detalle: error.message });
     }
 };
