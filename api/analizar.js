@@ -37,7 +37,7 @@ module.exports = async (req, res) => {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile', // <-- Modelo estable y garantizado
+                model: 'openai/gpt-oss-120b', // <-- Modelo estable y garantizado
                 messages: [{ role: 'system', content: prompt }],
                 response_format: { type: "json_object" },
                 temperature: 0.2
