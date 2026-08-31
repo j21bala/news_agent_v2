@@ -266,7 +266,7 @@ function buildPersonaHTML(p, ri, pi) {
                 <div>
                     <label class="block text-xs font-bold text-slate-600 mb-1">Tipo de identificación *</label>
                     <select id="tipo-${ri}-${pi}" class="w-full border border-slate-300 rounded p-2 text-sm focus:border-navy outline-none" onchange="window.actualizarTabla(${ri},${pi})">
-                        <option value="">Seleccionar...</option><option value="CC">Cédula de Ciudadanía</option><option value="CE">Cédula de Extranjería</option><option value="NIT">NIT</option><option value="Pasaporte">Pasaporte</option>
+                        <option value="">Seleccionar...</option><option value="?">Desconocido</option><option value="CC">Cédula de Ciudadanía</option><option value= "CE">Cédula de Extranjería</option><option value="NIT">NIT</option><option value="Pasaporte">Pasaporte</option>
                     </select>
                 </div>
                 <div>

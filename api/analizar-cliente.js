@@ -1,34 +1,24 @@
-const axios = require('axios'); 
+const axios = require("axios");
 
- 
+module.exports = async (req, res) => {
+  if (req.method !== "POST")
+    return res.status(405).json({ error: "Método no permitido" });
 
-module.exports = async (req, res) => { 
+  const { imagenes } = req.body;
 
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' }); 
+  const GEMINI_KEY = process.env.GEMINI_API_KEY;
 
- 
+  if (!imagenes || imagenes.length === 0) {
+    return res
+      .status(400)
+      .json({ error: "No se enviaron imágenes para analizar." });
+  }
 
-    const { imagenes } = req.body; 
+  // Construir el array de partes para Gemini (Texto + Imágenes)
 
-    const GEMINI_KEY = process.env.GEMINI_API_KEY; 
-
- 
-
-    if (!imagenes || imagenes.length === 0) { 
-
-        return res.status(400).json({ error: 'No se enviaron imágenes para analizar.' }); 
-
-    } 
-
- 
-
-    // Construir el array de partes para Gemini (Texto + Imágenes) 
-
-    const parts = [ 
-
-        { 
-
-            text: `Eres un analista de riesgo financiero SARLAFT. Analiza las siguientes imágenes de documentos de un cliente (pueden ser cédulas, estados financieros, certificados de ingresos). 
+  const parts = [
+    {
+      text: `Eres un analista de riesgo financiero SARLAFT. Analiza las siguientes imágenes de documentos de un cliente (pueden ser cédulas, estados financieros, certificados de ingresos). 
 
             Extrae la información y responde ÚNICA Y ESTRICTAMENTE con un objeto JSON válido con esta estructura: 
 
@@ -40,74 +30,49 @@ module.exports = async (req, res) => {
 
                 "alertas": ["alerta 1", "alerta 2"] (si el documento expira pronto, o hay inconsistencias en nombres/montos) 
 
-            }` 
+            }`,
+    },
+  ];
 
-        } 
+  // Adjuntar cada imagen en formato base64
 
-    ]; 
+  imagenes.forEach((base64Data) => {
+    parts.push({
+      inline_data: {
+        mime_type: "image/jpeg",
 
- 
+        data: base64Data,
+      },
+    });
+  });
 
-    // Adjuntar cada imagen en formato base64 
+  try {
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
 
-    imagenes.forEach(base64Data => { 
+      {
+        contents: [{ parts }],
 
-        parts.push({ 
+        generationConfig: {
+          temperature: 0.1,
 
-            inline_data: { 
+          response_mime_type: "application/json",
+        },
+      },
 
-                mime_type: "image/jpeg", 
+      { headers: { "Content-Type": "application/json" }, timeout: 30000 },
+    );
 
-                data: base64Data 
+    const rawText = response.data.candidates[0].content.parts[0].text;
 
-            } 
+    const data = JSON.parse(rawText);
 
-        }); 
+    return res.status(200).json(data);
+  } catch (error) {
+    console.error(error);
 
-    }); 
-
- 
-
-    try { 
-
-        const response = await axios.post( 
-
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`, 
-
-            { 
-
-                contents: [{ parts }], 
-
-                generationConfig: {  
-
-                    temperature: 0.1, 
-
-                    response_mime_type: "application/json"  
-
-                } 
-
-            }, 
-
-            { headers: { 'Content-Type': 'application/json' }, timeout: 30000 } 
-
-        ); 
-
- 
-
-        const rawText = response.data.candidates[0].content.parts[0].text; 
-
-        const data = JSON.parse(rawText); 
-
-         
-
-        return res.status(200).json(data); 
-
-    } catch (error) { 
-
-        console.error(error); 
-
-        return res.status(500).json({ error: 'Error procesando los documentos del cliente.' }); 
-
-    } 
-
-}; 
+    return res
+      .status(500)
+      .json({ error: "Error procesando los documentos del cliente." });
+  }
+};
