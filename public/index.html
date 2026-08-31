@@ -24,6 +24,7 @@
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        @media print { body * {visibility: visible; } #reporte-noticias, #reportes-ros {position: absolute; left:0; top: 0; width: 100%; } .no-print { display: none !important;}}
     </style>
 </head>
 <body class="bg-navy text-slate-100 font-sans min-h-screen selection:bg-teal selection:text-white">
@@ -81,7 +82,15 @@
                     </div>
                 </div>
                 <div id="reporte-noticias" class="hidden bg-white border border-slate-200 rounded-xl p-6 shadow-sm mt-4 fade-in">
-                    <h3 class="font-bold text-navy text-xl mb-4 border-b pb-2">Informe SARLAFT</h3>
+                    <div class= "flex justify-between items-center mb-4 border-b pb-2">
+                        <h3 class="font-bold text-navy text-xl mb-4 border-b pb-2">Informe SARLAFT</h3>
+                        <div class="flex gap-3 no-print">
+                            <button onclick="exportarExcel('noticias')" class="text-green-600 front-bold hover:underline text-sm"><i class="fa-solid fa-file-excel"></i>Excel</button>
+                             <button onclick="window.print()"class="text-red-600 front-bold hover:underline text-sm"><i class="fa-solid fa-file-pdf"></i>PDF</button>
+                        </div>
+                    </div>
+                    
+
                     <div id="contenido-noticias" class="text-sm text-slate-700"></div>
                 </div>
             </div>
@@ -131,8 +140,13 @@
                 </div>
             </div>
 
-            <div id="reporte-ros" class="hidden bg-white border border-slate-200 rounded-xl p-8 shadow-sm mt-6 fade-in">
+            <div id="ros" class="hidden bg-white border border-slate-200 rounded-xl p-8 shadow-sm mt-6 fade-in">
+
+                <div class="flex justify-between items-center mb_4 border-b pb-2">
                 <h3 class="font-bold text-navy text-xl mb-4 border-b pb-2">Reporte de Operaciones Sospechosas (ROS)</h3>
+                <button onclick="window.print()" class="text-red-600 front-bold hover:underline text-sm no-print"> <i class="fa-solid fa-file-pdf"></i> PDF</button>
+                </div>
+                
                 <pre id="contenido-ros" class="text-sm text-slate-700 whitespace-pre-wrap font-sans leading-relaxed"></pre>
             </div>
         </div>
