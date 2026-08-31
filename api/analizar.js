@@ -76,7 +76,7 @@ module.exports = async (req, res) => {
         if (link) {
             const extraido = await tavilyExtract(link);
             if (extraido) {
-                textoEnlace = extraido.substring(0, 8000);
+                textoEnlace = extraido.substring(0, 3000);
                 urlsEncontradas.push(link);
             }
         }
@@ -95,7 +95,7 @@ module.exports = async (req, res) => {
 }
 Incluye en "personas" a TODAS las personas naturales y funcionarios nombrados en el texto (máximo 6).
 
-Noticia: """${textoBase}"""`;
+Noticia: """${textoBase.substring(0, 3000)}"""`;
                 const raw = await groqChat(promptEntidades);
                 entidades = JSON.parse(raw);
             } catch (e) {
@@ -109,21 +109,21 @@ Noticia: """${textoBase}"""`;
             const queryGeneral = [entidades.titulo, entidades.lugar].filter(Boolean).join(' ') || textoBase.substring(0, 150);
             queries.push(queryGeneral);
 
-            const personas = (entidades.personas || []).slice(0, 5);
+            const personas = (entidades.personas || []).slice(0, 3);
             personas.forEach(nombre => {
                 queries.push(`"${nombre}" nombre completo ${entidades.lugar || ''}`.trim());
             });
 
-            const resultadosPorQuery = await Promise.all(queries.map(q => tavilySearch(q, 4)));
+            const resultadosPorQuery = await Promise.all(queries.map(q => tavilySearch(q, 3)));
 
             const bloques = [];
             resultadosPorQuery.forEach((results, idx) => {
                 results.forEach(r => {
-                    bloques.push(`[Búsqueda: "${queries[idx]}"] Fuente: ${r.url}\nContenido: ${(r.content || '').substring(0, 1200)}`);
+                    bloques.push(`[Búsqueda: "${queries[idx]}"] Fuente: ${r.url}\nContenido: ${(r.content || '').substring(0, 500)}`);
                     urlsEncontradas.push(r.url);
                 });
             });
-            contextoWeb = bloques.join('\n\n');
+            contextoWeb = bloques.join('\n\n').substring(0, 6000);
             urlsEncontradas = Array.from(new Set(urlsEncontradas));
         }
 
@@ -157,7 +157,7 @@ Responde ÚNICA Y EXCLUSIVAMENTE con este JSON:
  "fuentes_consultadas": []
 }
 
-Noticia (texto original${textoEnlace ? ' + artículo completo del enlace proporcionado' : ''}): """${textoBase}"""
+Noticia (texto original${textoEnlace ? ' + artículo completo del enlace proporcionado' : ''}): """${textoBase.substring(0, 6000)}"""
 
 Contexto web recopilado en internet (usa esto para completar nombres, cargos y estado del proceso):
 ${contextoWeb || 'No se encontraron resultados web adicionales.'}`;
