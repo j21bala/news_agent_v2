@@ -25,7 +25,7 @@ module.exports = async (req, res) => {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'llama3-70b-8192', // <-- Modelo estable y garantizado
+                model: 'llama-3.3-70b-versatile2', // <-- Modelo estable y garantizado
                 messages: [{ role: 'system', content: prompt }],
                 temperature: 0
             })
