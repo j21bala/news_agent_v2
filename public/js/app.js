@@ -1,276 +1,410 @@
+let reportes = [];
 let noticiaCount = 0;
-let contextoReporteActual = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-    window.agregarNoticia();
+    if (document.getElementById('noticias-container')) {
+        agregarNoticia();
+    }
 });
 
-window.agregarNoticia = function() {
+function agregarNoticia() {
     noticiaCount++;
+    const id = noticiaCount;
     const container = document.getElementById('noticias-container');
     if (!container) return;
 
     const div = document.createElement('div');
-    div.className = 'bg-slate-50 border border-slate-200 rounded-lg p-4 mb-3 fade-in';
-    div.id = `noticia-${noticiaCount}`;
+    div.className = 'noticia-item';
+    div.id = `noticia-${id}`;
     div.innerHTML = `
-        <div class="flex justify-between items-center mb-2">
-            <span class="font-bold text-sm text-navy">Fuente ${noticiaCount}</span>
-            ${noticiaCount > 1 ? `<button onclick="window.eliminarNoticia(${noticiaCount})" class="text-red-500 text-xs hover:underline"><i class="fa-solid fa-trash"></i> Quitar</button>` : ''}
+        <div class="noticia-item-header">
+            <span>Noticia ${id}</span>
+            ${id > 1 ? `<button class="danger-btn" onclick="eliminarNoticia(${id})">✕ Quitar</button>` : ''}
         </div>
-        <input type="text" id="link-${noticiaCount}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm mb-2 focus:outline-none focus:border-teal" placeholder="Enlace web (opcional)">
-        <textarea id="articulo-${noticiaCount}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm h-24 focus:outline-none focus:border-teal" placeholder="Pega el contenido de la noticia o los datos del sujeto..."></textarea>
+        <label>Link de la noticia</label>
+        <input type="text" id="link-${id}" placeholder="https://...">
+        <label>Texto completo de la noticia</label>
+        <textarea id="articulo-${id}" placeholder="Pega aquí el contenido de la noticia..."></textarea>
     `;
     container.appendChild(div);
-};
+}
 
-window.eliminarNoticia = function(id) {
-    document.getElementById(`noticia-${id}`)?.remove();
-};
+function eliminarNoticia(id) {
+    const el = document.getElementById(`noticia-${id}`);
+    if (el) el.remove();
+}
 
-window.analizarNoticias = async function() {
-    const btn = document.getElementById('btnAnalizarNoticias');
-    const status = document.getElementById('status-noticias');
+async function analizarTodas() {
+    const items = document.querySelectorAll('.noticia-item');
+    if (items.length === 0) { alert('Agrega al menos una noticia.'); return; }
+
+    const noticias = [];
+    let valido = true;
+    items.forEach(item => {
+        const id = item.id.replace('noticia-', '');
+        const link = document.getElementById(`link-${id}`)?.value.trim() || '';
+        const texto = document.getElementById(`articulo-${id}`)?.value.trim() || '';
+        if (!texto) {
+            document.getElementById(`articulo-${id}`).classList.add('error');
+            valido = false;
+        } else {
+            document.getElementById(`articulo-${id}`).classList.remove('error');
+        }
+        noticias.push({ link, texto });
+    });
+    if (!valido) { alert('Pega el texto en todas las noticias.'); return; }
+
+    const btn = document.getElementById('btnAnalizar');
+    const statusEl = document.getElementById('status');
+    if (btn) btn.disabled = true;
     
-    const articulos = [];
-    for (let i = 1; i <= noticiaCount; i++) {
-        const texto = document.getElementById(`articulo-${i}`)?.value.trim();
-        if (texto) articulos.push(texto);
+    reportes = [];
+
+    for (let i = 0; i < noticias.length; i++) {
+        if (statusEl) statusEl.textContent = `Analizando noticia ${i + 1} de ${noticias.length}...`;
+        try {
+            const res = await fetch('/api/analizar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ articulos: [noticias[i].texto] })
+            });
+            if (!res.ok) throw new Error("Error en el servidor backend");
+            const result = await res.json();
+            result._link = noticias[i].link;
+            reportes.push(result);
+        } catch (e) {
+            alert(`Error en noticia ${i + 1}: ${e.message}`);
+            if (btn) btn.disabled = false;
+            if (statusEl) statusEl.textContent = '';
+            return;
+        }
     }
 
-    if (articulos.length === 0) {
-        alert("Por favor, ingresa contenido o enlaces a analizar.");
-        return;
-    }
+    if (statusEl) statusEl.textContent = '';
+    if (btn) btn.disabled = false;
+    renderTodosReportes();
+    
+    const inputPanel = document.getElementById('inputPanel');
+    const reportPanel = document.getElementById('report');
+    if (inputPanel) inputPanel.style.display = 'none';
+    if (reportPanel) reportPanel.style.display = 'block';
+}
 
-    btn.disabled = true; btn.classList.add('opacity-50');
-    status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-teal"></i> Investigando en la web (Tavily) y generando informe gerencial...';
+function renderTodosReportes() {
+    const cont = document.getElementById('reportes-container');
+    if (!cont) return;
+    cont.innerHTML = '';
+    reportes.forEach((data, ri) => {
+        const bloque = document.createElement('div');
+        bloque.className = 'reporte-bloque';
+        bloque.id = `reporte-${ri}`;
+        bloque.innerHTML = buildReporteHTML(data, ri);
+        cont.appendChild(bloque);
+    });
+}
 
-    try {
-        const res = await fetch('/api/analizar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ articulos })
-        });
+const ICONOS = {
+    calendario: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px;margin-right:2px;"><path d="M7 2v2H5a2 2 0 0 0-2 2v2h18V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zM3 10v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V10H3z"/></svg>',
+    lugar: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px;margin-right:2px;"><path d="M12 2C7.6 2 4 5.6 4 10c0 5.4 8 12 8 12s8-6.6 8-12c0-4.4-3.6-8-8-8zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg>',
+    medio: '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px;margin-right:2px;"><path d="M4 4h13a2 2 0 0 1 2 2v1h1a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4zm2 3v2h9V7H6zm0 4v2h9v-2H6zm0 4v2h6v-2H6z"/></svg>'
+};
 
-        if (!res.ok) throw new Error("Error en el servidor");
-        const data = await res.json();
-        
-        contextoReporteActual = data; 
-        document.getElementById('reporte-noticias').classList.remove('hidden');
-        
-        let hechosHTML = (data.hechos_clave || []).map(h => `<li class="mb-1">${h}</li>`).join('');
-        let fuentesHTML = (data.fuentes || []).map(f => `<li class="truncate"><a href="${f}" target="_blank" class="text-blue-600 hover:underline">${f}</a></li>`).join('');
+function buildReporteHTML(data, ri) {
+    const personasHTML = (data.personas || []).map((p, pi) => buildPersonaHTML(p, ri, pi)).join('');
+    return `
+        <div class="cover">
+            <h2>${data.titulo || '—'}</h2>
+            <div class="meta">
+                <span>${ICONOS.calendario} ${data.fecha || 'No disponible'}</span>
+                <span>${ICONOS.lugar} ${data.lugar || 'No disponible'}</span>
+                <span>${ICONOS.medio} ${data.medio || 'No disponible'}</span>
+            </div>
+            ${data._link ? `<div class="link-noticia">🔗 ${data._link}</div>` : ''}
+        </div>
+        <div class="resumen">
+            <h3>Resumen general</h3>
+            <p>${resaltar(data.resumen)}</p>
+            <h3 style="margin-top:14px;">Hechos clave</h3>
+            <ul>${(data.hechos_clave || []).map(h => `<li>${resaltar(h)}</li>`).join('')}</ul>
+        </div>
+        <div id="personas-${ri}">${personasHTML}</div>
+        <button class="add-persona-btn no-print" onclick="agregarPersona(${ri})">+ Agregar involucrado</button>
+        ${buildFuentesHTML(data.fuentes_consultadas)}
+    `;
+}
 
-        // Renderizado del informe gerencial ejecutivo con tabla SARLAFT completa
-        document.getElementById('contenido-noticias').innerHTML = `
-            <div class="border-b pb-4 mb-4 flex justify-between items-start">
-                <div>
-                    <h3 class="text-2xl font-bold text-navy">${data.sujeto_nombre || 'Sujeto Investigado'}</h3>
-                    <p class="text-sm text-slate-500">${data.sujeto_perfil || ''}</p>
+function buildFuentesHTML(fuentes) {
+    if (!fuentes || fuentes.length === 0) return '';
+    const items = fuentes.map(f => `<li><a href="${f}" target="_blank" rel="noopener">${f}</a></li>`).join('');
+    return `<div class="resumen fuentes-consultadas"><h3>Fuentes consultadas</h3><ul>${items}</ul></div>`;
+}
+
+function claseEstado(estado) {
+    const e = String(estado || '').toLowerCase();
+    if (e.includes('detenid')) return 'e-detenido';
+    if (e.includes('conden')) return 'e-condenado';
+    if (e.includes('prófug') || e.includes('profug')) return 'e-profugo';
+    if (e.includes('fallec')) return 'e-fallecido';
+    if (e.includes('asesin')) return 'e-asesinado';
+    return 'e-investigado';
+}
+
+function filaTablaHTML(tipo, num, bcs, fid, prodbcs, prodfid, estado) {
+    const tipoVal = tipo || '<span class="desconocido">Desconocido</span>';
+    const numVal = num || '<span class="desconocido">Desconocido</span>';
+    const bcsVal = bcs ? '<span class="tag-si">✓ Sí</span>' : '<span class="tag-no">No</span>';
+    const fidVal = fid ? '<span class="tag-si">✓ Sí</span>' : '<span class="tag-no">No</span>';
+    const estadoTxt = estado || 'Investigado';
+    return `
+        <tr>
+            <td>${tipoVal}</td>
+            <td>${numVal}</td>
+            <td>${bcsVal}</td>
+            <td>${prodbcs || '<span class="desconocido">—</span>'}</td>
+            <td>${fidVal}</td>
+            <td>${prodfid || '<span class="desconocido">—</span>'}</td>
+            <td><span class="badge-estado ${claseEstado(estadoTxt)}">${estadoTxt}</span></td>
+        </tr>
+    `;
+}
+
+function buildPersonaHTML(p, ri, pi) {
+    const nivelRaw = String(p.nivel_riesgo_sugerido || 'medio').toLowerCase().trim();
+    const badgeClass = nivelRaw === 'alto' ? 'b-alto' : (nivelRaw === 'bajo' ? 'b-bajo' : 'b-medio');
+    const nivel = nivelRaw.toUpperCase();
+    const estadoInicial = (p.estado_proceso || 'Investigado').replace(/"/g, '&quot;');
+    return `
+        <div class="persona-card" id="persona-${ri}-${pi}" data-estado="${estadoInicial}">
+            <div class="persona-actions no-print">
+                <button class="danger-btn" onclick="eliminarPersona(${ri}, ${pi})">✕ Quitar</button>
+            </div>
+            <div class="p-head">
+                <div class="avatar">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="8" r="4" fill="#fff" opacity=".9"/>
+                        <path d="M4 20c0-4 3.5-6 8-6s8 2 8 6" fill="#fff" opacity=".9"/>
+                    </svg>
                 </div>
-                <span class="bg-red-600 text-white font-bold px-3 py-1 rounded-full text-xs uppercase">${data.riesgo_general || 'ALTO'}</span>
+                <div class="info">
+                    <div class="nombre" id="nombre-display-${ri}-${pi}">${p.nombre || 'Sin identificar'}</div>
+                    <div class="cargo">${p.cargo_o_actividad || ''}</div>
+                </div>
+                <span class="badge ${badgeClass}">${nivel}</span>
+            </div>
+            <div class="p-body">
+                <div class="line"><strong>Hechos:</strong> ${resaltar(p.rol_en_hechos)}</div>
+                <div class="line"><strong>Análisis de riesgo:</strong> ${resaltar(p.analisis_riesgo)}</div>
+                <div class="line justificacion"><strong>¿Por qué este nivel?</strong> ${resaltar(p.justificacion_riesgo) || 'No especificado'}</div>
             </div>
 
-            <div class="mb-4">
-                <h4 class="font-bold text-navy text-sm uppercase mb-1">Análisis de Riesgo:</h4>
-                <p class="text-sm text-slate-700 leading-relaxed">${data.analisis_riesgo}</p>
-            </div>
-
-            <div class="mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <h4 class="font-bold text-navy text-xs uppercase mb-1">¿Por qué este nivel?</h4>
-                <p class="text-xs text-slate-600 italic">${data.porque_este_nivel}</p>
-            </div>
-
-            <div class="mb-6">
-                <h4 class="font-bold text-navy text-sm uppercase mb-2">Hechos Clave:</h4>
-                <ul class="list-disc pl-5 text-sm text-slate-700 space-y-1">${hechosHTML}</ul>
-            </div>
-
-            <div class="overflow-x-auto mb-6">
-                <table class="w-full text-left border-collapse text-xs">
+            <div class="tabla-datos" id="tabla-${ri}-${pi}">
+                <table>
                     <thead>
-                        <tr class="bg-navy text-white">
-                            <th class="p-2 border">TIPO ID</th>
-                            <th class="p-2 border">NÚMERO ID</th>
-                            <th class="p-2 border">CLIENTE BCS</th>
-                            <th class="p-2 border">PRODUCTOS BCS</th>
-                            <th class="p-2 border">CLIENTE FIDUCIARIA</th>
-                            <th class="p-2 border">PROD. FIDUCIARIA</th>
-                            <th class="p-2 border">ESTADO</th>
+                        <tr>
+                            <th>Tipo ID</th>
+                            <th>Número ID</th>
+                            <th>Cliente BCS</th>
+                            <th>Productos BCS</th>
+                            <th>Cliente Fiduciaria</th>
+                            <th>Productos Fiduciaria</th>
+                            <th>Estado</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr class="bg-white text-slate-800">
-                            <td class="p-2 border font-semibold">${data.tipo_id || 'CC'}</td>
-                            <td class="p-2 border">${data.numero_id || 'N/A'}</td>
-                            <td class="p-2 border">${data.cliente_bcs || 'No'}</td>
-                            <td class="p-2 border">${data.productos_bcs || 'No aplica'}</td>
-                            <td class="p-2 border">${data.cliente_fiduciaria || 'No'}</td>
-                            <td class="p-2 border">${data.productos_fiduciaria || 'No aplica'}</td>
-                            <td class="p-2 border font-bold text-amber-700">${data.estado || 'Investigado'}</td>
-                        </tr>
-                    </tbody>
+                    <tbody id="tabla-body-${ri}-${pi}">${filaTablaHTML('', '', false, false, '', '', p.estado_proceso)}</tbody>
                 </table>
             </div>
 
-            <div class="mb-6 bg-amber-50 border-l-4 border-amber-500 p-3 rounded">
-                <span class="font-bold text-xs uppercase text-amber-900 block mb-1">Recomendación del analista:</span>
-                <p class="text-xs text-amber-800">${data.recomendacion}</p>
+            <div class="recomendacion-box" id="recom-display-${ri}-${pi}" style="display:none;"></div>
+
+            <div class="edit-fields no-print">
+                <div class="grid-2">
+                    <div>
+                        <label>Tipo de identificación *</label>
+                        <select id="tipo-${ri}-${pi}" onchange="actualizarTabla(${ri},${pi})">
+                            <option value="">-- Seleccionar --</option>
+                            <option value="Desconocido">Desconocido</option>
+                            <option value="CC">Cédula de Ciudadanía</option>
+                            <option value="CE">Cédula de Extranjería</option>
+                            <option value="NIT">NIT</option>
+                            <option value="Pasaporte">Pasaporte</option>
+                            <option value="TI">Tarjeta de Identidad</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Número de identificación *</label>
+                        <input type="text" id="num-${ri}-${pi}" placeholder="Ej. 1000123456 o Desconocido" oninput="actualizarTabla(${ri},${pi})">
+                    </div>
+                </div>
+                <div class="check-row">
+                    <label><input type="checkbox" id="bcs-${ri}-${pi}" onchange="actualizarTabla(${ri},${pi})"> Cliente BCS</label>
+                    <label><input type="checkbox" id="fid-${ri}-${pi}" onchange="actualizarTabla(${ri},${pi})"> Cliente Fiduciaria</label>
+                </div>
+                <div class="grid-2">
+                    <div>
+                        <label>Productos BCS</label>
+                        <input type="text" id="prodbcs-${ri}-${pi}" placeholder="Ej. Cuenta corriente..." oninput="actualizarTabla(${ri},${pi})">
+                    </div>
+                    <div>
+                        <label>Productos Fiduciaria</label>
+                        <input type="text" id="prodfid-${ri}-${pi}" placeholder="Ej. Fideicomiso..." oninput="actualizarTabla(${ri},${pi})">
+                    </div>
+                </div>
+                <div style="margin-top:10px;">
+                    <label>Editar nombre del involucrado</label>
+                    <input type="text" id="nombre-edit-${ri}-${pi}" value="${p.nombre || ''}" oninput="document.getElementById('nombre-display-${ri}-${pi}').textContent=this.value" placeholder="Nombre completo">
+                </div>
+                <div style="margin-top:10px;">
+                    <label>Recomendación del analista</label>
+                    <textarea id="recom-${ri}-${pi}" oninput="actualizarRecomendacion(${ri},${pi})" placeholder="Ej. Se recomienda reportar a la UIAF..."></textarea>
+                </div>
             </div>
+        </div>
+    `;
+}
 
-            <div>
-                <h4 class="font-bold text-navy text-xs uppercase mb-2">Fuentes Consultadas (Tavily & Web):</h4>
-                <ul class="list-disc pl-5 text-xs text-slate-500 space-y-1">${fuentesHTML}</ul>
-            </div>
-        `;
+function actualizarTabla(ri, pi) {
+    const tipo = document.getElementById(`tipo-${ri}-${pi}`)?.value || '';
+    const num = document.getElementById(`num-${ri}-${pi}`)?.value || '';
+    const bcs = document.getElementById(`bcs-${ri}-${pi}`)?.checked || false;
+    const fid = document.getElementById(`fid-${ri}-${pi}`)?.checked || false;
+    const prodbcs = document.getElementById(`prodbcs-${ri}-${pi}`)?.value || '';
+    const prodfid = document.getElementById(`prodfid-${ri}-${pi}`)?.value || '';
 
-        document.getElementById('chat-historial').innerHTML = `<div class="text-center text-teal text-xs mb-3 border-b pb-2">Contexto de investigación cargado. El asistente web está listo.</div>`;
-        status.textContent = '¡Informe gerencial generado con éxito!';
+    document.getElementById(`tipo-${ri}-${pi}`)?.classList.remove('error');
+    document.getElementById(`num-${ri}-${pi}`)?.classList.remove('error');
 
-    } catch (error) {
-        status.innerHTML = '<span class="text-red-500">Error en el análisis y búsqueda web.</span>';
-    } finally {
-        btn.disabled = false; btn.classList.remove('opacity-50');
+    const tbody = document.getElementById(`tabla-body-${ri}-${pi}`);
+    const card = document.getElementById(`persona-${ri}-${pi}`);
+    if (!tbody || !card) return;
+
+    tbody.innerHTML = filaTablaHTML(tipo, num, bcs, fid, prodbcs, prodfid, card.dataset.estado);
+}
+
+function actualizarRecomendacion(ri, pi) {
+    const texto = document.getElementById(`recom-${ri}-${pi}`)?.value.trim() || '';
+    const disp = document.getElementById(`recom-display-${ri}-${pi}`);
+    if (!disp) return;
+    if (!texto) {
+        disp.style.display = 'none';
+        disp.innerHTML = '';
+        return;
     }
-};
+    disp.innerHTML = `<strong>Recomendación del analista:</strong> ${texto}`;
+    disp.style.display = 'block';
+}
 
-window.enviarPregunta = async function() {
-    const input = document.getElementById('chat-input');
-    const pregunta = input.value.trim();
-    if (!pregunta) return;
-    if (!contextoReporteActual) return alert("Primero debes analizar una noticia para activar el asistente.");
-
-    const historial = document.getElementById('chat-historial');
-    historial.innerHTML += `<div class="self-end bg-navy text-white px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2">${pregunta}</div>`;
-    input.value = '';
-    historial.scrollTop = historial.scrollHeight;
-
-    const idTemp = 'temp-' + Date.now();
-    historial.innerHTML += `<div id="${idTemp}" class="self-start bg-slate-200 text-slate-500 px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2"><i class="fa-solid fa-ellipsis fa-fade"></i></div>`;
-    historial.scrollTop = historial.scrollHeight;
-
-    try {
-        const res = await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pregunta, contexto: contextoReporteActual })
-        });
-        const data = await res.json();
-        document.getElementById(idTemp).outerHTML = `<div class="self-start bg-slate-200 text-navy px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2">${data.respuesta}</div>`;
-    } catch (error) {
-        document.getElementById(idTemp).outerHTML = `<div class="self-start bg-red-100 text-red-600 px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2">Error de conexión con el asistente.</div>`;
-    }
-    historial.scrollTop = historial.scrollHeight;
-};
-
-window.mostrarArchivos = function(inputId, listaId) {
-    const input = document.getElementById(inputId);
-    const lista = document.getElementById(listaId);
-    lista.innerHTML = '';
-    Array.from(input.files).forEach(file => {
-        lista.innerHTML += `<li><i class="fa-solid fa-file-lines text-slate-400 mr-2"></i> ${file.name}</li>`;
+function validarCamposObligatorios() {
+    let ok = true;
+    document.querySelectorAll('.persona-card').forEach(card => {
+        const [ri, pi] = card.id.replace('persona-', '').split('-');
+        const tipoEl = document.getElementById(`tipo-${ri}-${pi}`);
+        const numEl = document.getElementById(`num-${ri}-${pi}`);
+        if (tipoEl && !tipoEl.value) { tipoEl.classList.add('error'); ok = false; }
+        if (numEl && !numEl.value.trim()) { numEl.classList.add('error'); ok = false; }
     });
-};
+    return ok;
+}
 
-window.analizarROS = async function() {
-    const btn = document.getElementById('btnAnalizarRos');
-    const status = document.getElementById('status-ros');
-    const plantillaPrompt = document.getElementById('rosPlantilla').value.trim();
-    const files = document.getElementById('rosArchivos').files;
+function agregarPersona(ri) {
+    const personaVacia = {
+        nombre: 'Nuevo involucrado',
+        rol_en_hechos: '',
+        cargo_o_actividad: '',
+        analisis_riesgo: '',
+        estado_proceso: 'Investigado',
+        justificacion_riesgo: '',
+        nivel_riesgo_sugerido: 'medio'
+    };
+    if (!reportes[ri].personas) reportes[ri].personas = [];
+    const pi = reportes[ri].personas.length;
+    reportes[ri].personas.push(personaVacia);
 
-    if (!plantillaPrompt || files.length === 0) {
-        return alert("Ingresa la plantilla y selecciona al menos un documento.");
+    const cont = document.getElementById(`personas-${ri}`);
+    const div = document.createElement('div');
+    div.innerHTML = buildPersonaHTML(personaVacia, ri, pi);
+    cont.appendChild(div.firstElementChild);
+}
+
+function eliminarPersona(ri, pi) {
+    document.getElementById(`persona-${ri}-${pi}`)?.remove();
+}
+
+function volver() {
+    const inputPanel = document.getElementById('inputPanel');
+    const reportPanel = document.getElementById('report');
+    if (inputPanel) inputPanel.style.display = 'block';
+    if (reportPanel) reportPanel.style.display = 'none';
+}
+
+function resaltar(texto) {
+    if (!texto) return '';
+    return String(texto).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
+function exportarExcel() {
+    if (!validarCamposObligatorios()) {
+        alert("Completa el Tipo y Número de identificación de todos los involucrados.");
+        return;
     }
 
-    btn.disabled = true; btn.classList.add('opacity-50');
-    status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-gold"></i> Leyendo documentos y generando ROS...';
+    const hoy = new Date().toLocaleDateString('es-CO');
+    const filas = [];
 
-    try {
-        let textoDocumentos = "";
-        for (const file of files) {
-            textoDocumentos += `\n--- Archivo: ${file.name} ---\n`;
-            textoDocumentos += await file.text();
-        }
+    reportes.forEach((data, ri) => {
+        (data.personas || []).forEach((p, pi) => {
+            const tipo = document.getElementById(`tipo-${ri}-${pi}`)?.value || '';
+            const num = document.getElementById(`num-${ri}-${pi}`)?.value || '';
+            const bcs = document.getElementById(`bcs-${ri}-${pi}`)?.checked ? 'Sí' : 'No';
+            const fid = document.getElementById(`fid-${ri}-${pi}`)?.checked ? 'Sí' : 'No';
+            const prodbcs = document.getElementById(`prodbcs-${ri}-${pi}`)?.value || '';
+            const prodfid = document.getElementById(`prodfid-${ri}-${pi}`)?.value || '';
+            const nombre = document.getElementById(`nombre-edit-${ri}-${pi}`)?.value || p.nombre || '';
 
-        const res = await fetch('/api/generar-ros', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ plantillaPrompt, textoDocumentos })
+            filas.push({
+                'Fecha Ingreso': hoy,
+                'Originador': data.medio || '',
+                'Enlace': data._link || (data.fuentes_consultadas || [])[0] || '',
+                'Titular': data.titulo || '',
+                'Personas involucradas': nombre,
+                'Tipo de Documento': tipo,
+                'N° Documento': num,
+                'Cliente de BCS': bcs,
+                'Producto en BCS': prodbcs,
+                'Cliente de FIDU': fid,
+                'Producto en FIDU': prodfid,
+                'Estado': p.estado_proceso || '',
+                'Fecha Respuesta': hoy,
+                'Tipo delito': p.rol_en_hechos || ''
+            });
         });
-
-        if (!res.ok) throw new Error("Error en el servidor");
-        const data = await res.json();
-
-        document.getElementById('reporte-ros').classList.remove('hidden');
-        document.getElementById('contenido-ros').textContent = data.informe;
-        status.textContent = '¡ROS Generado exitosamente!';
-    } catch (error) {
-        status.innerHTML = '<span class="text-red-500">Error al generar ROS.</span>';
-    } finally {
-        btn.disabled = false; btn.classList.remove('opacity-50');
-    }
-};
-
-let imagenesBase64 = [];
-window.mostrarPreviewImagenes = function() {
-    const input = document.getElementById('clienteImagenes');
-    const preview = document.getElementById('preview-imagenes');
-    preview.innerHTML = '';
-    imagenesBase64 = [];
-    
-    const files = Array.from(input.files).slice(0, 6); 
-    files.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const base64String = e.target.result;
-            imagenesBase64.push(base64String.split(',')[1]); 
-            preview.innerHTML += `<div class="w-24 h-24 rounded-lg border border-slate-300 overflow-hidden shadow-sm"><img src="${base64String}" class="w-full h-full object-cover"></div>`;
-        };
-        reader.readAsDataURL(file);
     });
-};
 
-window.analizarCliente = async function() {
-    const btn = document.getElementById('btnAnalizarCliente');
-    const status = document.getElementById('status-cliente');
-    
-    if (imagenesBase64.length === 0) return alert("Sube al menos una imagen.");
+    if (filas.length === 0) { alert('No hay involucrados para exportar.'); return; }
 
-    btn.disabled = true; btn.classList.add('opacity-50');
-    status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-purple-600"></i> Analizando...';
+    const ws = XLSX.utils.json_to_sheet(filas);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'SARLAFT');
+    XLSX.writeFile(wb, `Informes_SARLAFT_${hoy.replace(/\//g, '-')}.xlsx`);
+}
 
-    try {
-        const res = await fetch('/api/analizar-cliente', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imagenes: imagenesBase64 })
-        });
-
-        if (!res.ok) throw new Error("Error en el servidor");
-        const data = await res.json();
-
-        document.getElementById('dashboard-resultado').classList.remove('hidden');
-        document.getElementById('dash-perfil').innerHTML = `
-            <div class="text-3xl font-bold text-teal mb-2">Score: ${data.score_riesgo || 'N/A'}/100</div>
-            <p><strong>Ingresos Calculados:</strong> $${data.ingresos_calculados || '0'}</p>
-        `;
-        document.getElementById('dash-alertas').innerHTML = (data.alertas || []).map(a => `<li>${a}</li>`).join('');
-        status.textContent = 'Dashboard generado.';
-    } catch (error) {
-        status.innerHTML = '<span class="text-red-500">Error procesando imágenes.</span>';
-    } finally {
-        btn.disabled = false; btn.classList.remove('opacity-50');
+function exportarPDF() {
+    if (!validarCamposObligatorios()) {
+        alert("Completa el Tipo y Número de identificación.");
+        return;
     }
-};
 
-window.exportarExcel = function(tipo) {
-    if (tipo === 'noticias' && contextoReporteActual) {
-        const ws = XLSX.utils.json_to_sheet([contextoReporteActual]);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Informe SARLAFT");
-        XLSX.writeFile(wb, "Reporte_SARLAFT.xlsx");
-    } else {
-        alert("No hay datos para exportar.");
-    }
-};
+    const reporte = document.getElementById("report");
+    const tituloOriginal = document.title;
+    const nombreArchivo = (reportes[0]?.titulo || "Informe_SARLAFT").replace(/[^\w]/g, "_");
+    document.title = nombreArchivo;
+
+    reporte.classList.add("pdf-export");
+    const limpiar = () => {
+        reporte.classList.remove("pdf-export");
+        document.title = tituloOriginal;
+        window.removeEventListener("afterprint", limpiar);
+    };
+    window.addEventListener("afterprint", limpiar);
+    window.print();
+    setTimeout(limpiar, 1500);
+}
