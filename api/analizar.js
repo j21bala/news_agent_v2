@@ -17,7 +17,7 @@ module.exports = async (req, res) => {
                 const tavilyRes = await fetch('https://api.tavily.com/search', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ api_key: TAVILY_KEY, query: queryBusqueda, search_depth: 'basic', max_results: 4 })
+                    body: JSON.stringify({ api_key: TAVILY_KEY, query: queryBusqueda, search_depth: 'advanced', max_results: 4 })
                 });
                 const tavilyData = await tavilyRes.json();
                 if (tavilyData.results) {
@@ -32,42 +32,36 @@ module.exports = async (req, res) => {
 
     const textoLocal = (articulos || []).join('\n\n---\n\n');
 
-    const prompt = `Eres un analista senior de riesgo SARLAFT que redacta informes para un comité de cumplimiento. Analiza la siguiente noticia y extrae la información rigurosamente.
+    const prompt = `Eres un analista senior de riesgo SARLAFT. Analiza la noticia y el contexto web.
+    
+    Reglas:
+    - "titulo": titular exacto.
+    - "resumen": 5 a 7 frases.
+    - "hechos_clave": 4 a 6 hechos.
+    - "personas": lista a TODOS los involucrados. Para cada uno define: nombre, rol_en_hechos (delito), cargo_o_actividad, analisis_riesgo (detallado), estado_proceso (Investigado, Detenido, Condenado, Prófugo, Fallecido), justificacion_riesgo (1 frase) y nivel_riesgo_sugerido (alto, medio, bajo).
 
-Reglas de redacción obligatorias:
-- "titulo": usa EXACTAMENTE el titular de la noticia principal.
-- "medio": nombre del medio periodístico detectado.
-- "fecha": fecha de publicación (ej. "14 de julio de 2024").
-- "lugar": ciudad, departamento o país.
-- "resumen": 5 a 7 frases con datos concretos resaltando con doble asterisco **dato** 2 o 3 datos clave.
-- "hechos_clave": 4 a 6 hechos diferentes que no repitan el resumen.
-- "personas": lista a TODOS los involucrados mencionados (nombre completo, rol/delito, estado del proceso entre: "Investigado", "Detenido", "Condenado", "Prófugo", "Fallecido", "Asesinado", análisis de riesgo detallado, justificación y nivel de riesgo sugerido: alto, medio, bajo).
+    Responde ÚNICA Y EXCLUSIVAMENTE con este JSON:
+    {
+     "titulo": "Titular",
+     "medio": "Medio",
+     "fecha": "Fecha",
+     "lugar": "Lugar",
+     "resumen": "Resumen...",
+     "hechos_clave": ["hecho 1","hecho 2"],
+     "personas": [{
+        "nombre": "Nombre completo",
+        "rol_en_hechos": "Delito",
+        "cargo_o_actividad": "Cargo",
+        "analisis_riesgo": "Análisis...",
+        "estado_proceso": "Investigado",
+        "justificacion_riesgo": "Justificación...",
+        "nivel_riesgo_sugerido": "alto"
+     }],
+     "fuentes_consultadas": []
+    }
 
-Responde ÚNICA Y EXCLUSIVAMENTE con un objeto JSON válido con esta estructura exacta:
-{
- "titulo": "Titular",
- "medio": "Medio",
- "fecha": "Fecha",
- "lugar": "Lugar",
- "resumen": "Resumen...",
- "hechos_clave": ["hecho 1","hecho 2"],
- "personas": [{
-    "nombre": "Nombre completo",
-    "rol_en_hechos": "Delito específico",
-    "cargo_o_actividad": "Cargo o actividad",
-    "analisis_riesgo": "Análisis detallado...",
-    "estado_proceso": "Investigado",
-    "justificacion_riesgo": "Justificación...",
-    "nivel_riesgo_sugerido": "alto"
- }],
- "fuentes_consultadas": []
-}
-
-Texto de la noticia:
-"""${textoLocal}"""
-
-Contexto web adicional:
-${contextoWeb}`;
+    Noticia: """${textoLocal}"""
+    Contexto Web: ${contextoWeb}`;
 
     try {
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -80,19 +74,14 @@ ${contextoWeb}`;
             })
         });
 
-        if (!response.ok) {
-            const err = await response.text();
-            return res.status(response.status).json({ error: 'Error en Groq', detalle: err });
-        }
+        const data = await response.json();
+        if (!response.ok) return res.status(response.status).json({ error: 'Error IA', detalle: data });
 
-        const json = await response.json();
-        let text = json.choices[0].message.content.trim();
-        text = text.replace(/```json|```/g, '').trim();
-        const data = JSON.parse(text);
-
-        data.fuentes_consultadas = Array.from(new Set([...(data.fuentes_consultadas || []), ...urlsEncontradas]));
-        return res.status(200).json(data);
+        const jsonRespuesta = JSON.parse(data.choices[0].message.content);
+        jsonRespuesta.fuentes_consultadas = Array.from(new Set([...(jsonRespuesta.fuentes_consultadas || []), ...urlsEncontradas]));
+        
+        return res.status(200).json(jsonRespuesta);
     } catch (error) {
-        return res.status(500).json({ error: 'Falla interna en el servidor', detalle: error.message });
+        return res.status(500).json({ error: 'Fallo servidor', detalle: error.message });
     }
 };
