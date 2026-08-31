@@ -1,3 +1,53 @@
+// ==========================================
+// 1. NAVEGACIÓN SPA (Global e Inmediata)
+// ==========================================
+function navegarA(idVista) {
+    const vistas = ['view-menu', 'view-noticias', 'view-ros', 'view-cliente'];
+    vistas.forEach(vista => {
+        const el = document.getElementById(vista);
+        if (el) el.classList.add('hidden');
+    });
+
+    const destino = document.getElementById(idVista);
+    if (destino) {
+        destino.classList.remove('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+}
+
+// ==========================================
+// 2. MÓDULO: NOTICIAS & CHAT ASISTENTE
+// ==========================================
+let noticiaCount = 0;
+let contextoReporteActual = null;
+
+document.addEventListener("DOMContentLoaded", () => {
+    agregarNoticia();
+});
+
+function agregarNoticia() {
+    noticiaCount++;
+    const container = document.getElementById('noticias-container');
+    if (!container) return;
+
+    const div = document.createElement('div');
+    div.className = 'bg-slate-50 border border-slate-200 rounded-lg p-4 mb-3 fade-in';
+    div.id = `noticia-${noticiaCount}`;
+    div.innerHTML = `
+        <div class="flex justify-between items-center mb-2">
+            <span class="font-bold text-sm text-navy">Noticia ${noticiaCount}</span>
+            ${noticiaCount > 1 ? `<button onclick="eliminarNoticia(${noticiaCount})" class="text-red-500 text-xs hover:underline"><i class="fa-solid fa-trash"></i> Quitar</button>` : ''}
+        </div>
+        <input type="text" id="link-${noticiaCount}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm mb-2 focus:outline-none focus:border-teal" placeholder="Enlace web (opcional)">
+        <textarea id="articulo-${noticiaCount}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm h-24 focus:outline-none focus:border-teal" placeholder="Pega el texto de la noticia aquí..."></textarea>
+    `;
+    container.appendChild(div);
+}
+
+function eliminarNoticia(id) {
+    document.getElementById(`noticia-${id}`)?.remove();
+}
+
 async function analizarNoticias() {
     const btn = document.getElementById('btnAnalizarNoticias');
     const status = document.getElementById('status-noticias');
@@ -32,7 +82,6 @@ async function analizarNoticias() {
         let hechosHTML = (data.hechos_clave || []).map(h => `<li class="mb-1">${h}</li>`).join('');
         let fuentesHTML = (data.fuentes || []).map(f => `<li class="truncate"><a href="${f}" target="_blank" class="text-blue-600 hover:underline">${f}</a></li>`).join('');
 
-        // Renderizado del informe corporativo idéntico a tus estándares operativos
         document.getElementById('contenido-noticias').innerHTML = `
             <div class="border-b pb-4 mb-4 flex justify-between items-start">
                 <div>
@@ -57,7 +106,6 @@ async function analizarNoticias() {
                 <ul class="list-disc pl-5 text-sm text-slate-700 space-y-1">${hechosHTML}</ul>
             </div>
 
-            <!-- Tabla de Datos del Cliente / Identificación -->
             <div class="overflow-x-auto mb-6">
                 <table class="w-full text-left border-collapse text-xs">
                     <thead>
@@ -103,5 +151,145 @@ async function analizarNoticias() {
         status.innerHTML = '<span class="text-red-500">Error en el análisis y búsqueda web.</span>';
     } finally {
         btn.disabled = false; btn.classList.remove('opacity-50');
+    }
+}
+
+async function enviarPregunta() {
+    const input = document.getElementById('chat-input');
+    const pregunta = input.value.trim();
+    if (!pregunta) return;
+    if (!contextoReporteActual) return alert("Primero debes analizar una noticia para activar el asistente.");
+
+    const historial = document.getElementById('chat-historial');
+    historial.innerHTML += `<div class="self-end bg-navy text-white px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2">${pregunta}</div>`;
+    input.value = '';
+    historial.scrollTop = historial.scrollHeight;
+
+    const idTemp = 'temp-' + Date.now();
+    historial.innerHTML += `<div id="${idTemp}" class="self-start bg-slate-200 text-slate-500 px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2"><i class="fa-solid fa-ellipsis fa-fade"></i></div>`;
+    historial.scrollTop = historial.scrollHeight;
+
+    try {
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pregunta, contexto: contextoReporteActual })
+        });
+        const data = await res.json();
+        document.getElementById(idTemp).outerHTML = `<div class="self-start bg-slate-200 text-navy px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2">${data.respuesta}</div>`;
+    } catch (error) {
+        document.getElementById(idTemp).outerHTML = `<div class="self-start bg-red-100 text-red-600 px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2">Error de conexión con el asistente.</div>`;
+    }
+    historial.scrollTop = historial.scrollHeight;
+}
+
+function mostrarArchivos(inputId, listaId) {
+    const input = document.getElementById(inputId);
+    const lista = document.getElementById(listaId);
+    lista.innerHTML = '';
+    Array.from(input.files).forEach(file => {
+        lista.innerHTML += `<li><i class="fa-solid fa-file-lines text-slate-400 mr-2"></i> ${file.name}</li>`;
+    });
+}
+
+async function analizarROS() {
+    const btn = document.getElementById('btnAnalizarRos');
+    const status = document.getElementById('status-ros');
+    const plantillaPrompt = document.getElementById('rosPlantilla').value.trim();
+    const files = document.getElementById('rosArchivos').files;
+
+    if (!plantillaPrompt || files.length === 0) {
+        return alert("Ingresa la plantilla y selecciona al menos un documento.");
+    }
+
+    btn.disabled = true; btn.classList.add('opacity-50');
+    status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-gold"></i> Leyendo documentos y generando ROS...';
+
+    try {
+        let textoDocumentos = "";
+        for (const file of files) {
+            textoDocumentos += `\n--- Archivo: ${file.name} ---\n`;
+            textoDocumentos += await file.text();
+        }
+
+        const res = await fetch('/api/generar-ros', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plantillaPrompt, textoDocumentos })
+        });
+
+        if (!res.ok) throw new Error("Error en el servidor");
+        const data = await res.json();
+
+        document.getElementById('reporte-ros').classList.remove('hidden');
+        document.getElementById('contenido-ros').textContent = data.informe;
+        status.textContent = '¡ROS Generado exitosamente!';
+    } catch (error) {
+        status.innerHTML = '<span class="text-red-500">Error al generar ROS.</span>';
+    } finally {
+        btn.disabled = false; btn.classList.remove('opacity-50');
+    }
+}
+
+let imagenesBase64 = [];
+function mostrarPreviewImagenes() {
+    const input = document.getElementById('clienteImagenes');
+    const preview = document.getElementById('preview-imagenes');
+    preview.innerHTML = '';
+    imagenesBase64 = [];
+    
+    const files = Array.from(input.files).slice(0, 6); 
+    files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const base64String = e.target.result;
+            imagenesBase64.push(base64String.split(',')[1]); 
+            preview.innerHTML += `<div class="w-24 h-24 rounded-lg border border-slate-300 overflow-hidden shadow-sm"><img src="${base64String}" class="w-full h-full object-cover"></div>`;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+async function analizarCliente() {
+    const btn = document.getElementById('btnAnalizarCliente');
+    const status = document.getElementById('status-cliente');
+    
+    if (imagenesBase64.length === 0) return alert("Sube al menos una imagen.");
+
+    btn.disabled = true; btn.classList.add('opacity-50');
+    status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-purple-600"></i> Analizando...';
+
+    try {
+        const res = await fetch('/api/analizar-cliente', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imagenes: imagenesBase64 })
+        });
+
+        if (!res.ok) throw new Error("Error en el servidor");
+        const data = await res.json();
+
+        document.getElementById('dashboard-resultado').classList.remove('hidden');
+        document.getElementById('dash-perfil').innerHTML = `
+            <div class="text-3xl font-bold text-teal mb-2">Score: ${data.score_riesgo || 'N/A'}/100</div>
+            <p><strong>Ingresos Calculados:</strong> $${data.ingresos_calculados || '0'}</p>
+        `;
+        document.getElementById('dash-alertas').innerHTML = (data.alertas || []).map(a => `<li>${a}</li>`).join('');
+        status.textContent = 'Dashboard generado.';
+    } catch (error) {
+        status.innerHTML = '<span class="text-red-500">Error procesando imágenes.</span>';
+    } finally {
+        btn.disabled = false; btn.classList.remove('opacity-50');
+    }
+}
+
+function exportarExcel(tipo) {
+    if (tipo === 'noticias' && contextoReporteActual) {
+        const ws = XLSX.utils.json_to_sheet([contextoReporteActual]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Informe SARLAFT");
+        XLSX.writeFile(wb, "Reporte_SARLAFT.xlsx");
+    } else {
+        alert("No hay datos para exportar.");
     }
 }
