@@ -1,12 +1,9 @@
-// ==========================================
-// 1. NAVEGACIÓN Y VARIABLES GLOBALES
-// ==========================================
 let reportes = [];
 let noticiaCount = 0;
 let contextoReporteActual = null;
 
 window.navegarA = function(idVista) {
-    const vistas = ['view-menu', 'view-noticias', 'view-ros', 'view-cliente'];
+    const vistas = ['view-menu', 'view-noticias', 'view-reporte', 'view-ros', 'view-cliente'];
     vistas.forEach(vista => {
         const el = document.getElementById(vista);
         if (el) el.classList.add('hidden');
@@ -19,29 +16,24 @@ window.navegarA = function(idVista) {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-    if (document.getElementById('noticias-container')) {
-        window.agregarNoticia();
-    }
+    if (document.getElementById('noticias-container')) window.agregarNoticia();
 });
 
-// ==========================================
-// 2. MÓDULO DE NOTICIAS (Adaptado V1 -> V2)
-// ==========================================
 window.agregarNoticia = function() {
     noticiaCount++;
+    const id = noticiaCount;
     const container = document.getElementById('noticias-container');
     if (!container) return;
-
     const div = document.createElement('div');
-    div.className = 'bg-slate-50 border border-slate-200 rounded-lg p-4 mb-3';
-    div.id = `noticia-${noticiaCount}`;
+    div.className = 'bg-slate-50 border border-slate-200 rounded-lg p-5 mb-4';
+    div.id = `noticia-${id}`;
     div.innerHTML = `
-        <div class="flex justify-between items-center mb-2">
-            <span class="font-bold text-sm text-navy">Fuente ${noticiaCount}</span>
-            ${noticiaCount > 1 ? `<button onclick="window.eliminarNoticia(${noticiaCount})" class="text-red-500 text-xs hover:underline"><i class="fa-solid fa-trash"></i> Quitar</button>` : ''}
+        <div class="flex justify-between items-center mb-3">
+            <span class="font-bold text-sm text-navy">Fuente ${id}</span>
+            ${id > 1 ? `<button onclick="window.eliminarNoticia(${id})" class="text-red-500 text-xs hover:underline font-bold"><i class="fa-solid fa-trash"></i> Quitar</button>` : ''}
         </div>
-        <input type="text" id="link-${noticiaCount}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm mb-2 focus:border-teal outline-none" placeholder="Enlace web (opcional)">
-        <textarea id="articulo-${noticiaCount}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm h-24 focus:border-teal outline-none" placeholder="Pega el texto aquí..."></textarea>
+        <input type="text" id="link-${id}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm mb-3 focus:outline-none focus:border-teal" placeholder="Enlace web de la noticia (opcional)">
+        <textarea id="articulo-${id}" class="w-full border border-slate-300 rounded-md px-3 py-2 text-sm h-32 focus:outline-none focus:border-teal" placeholder="Pega el texto completo de la noticia aquí..."></textarea>
     `;
     container.appendChild(div);
 };
@@ -50,204 +42,304 @@ window.eliminarNoticia = function(id) {
     document.getElementById(`noticia-${id}`)?.remove();
 };
 
-window.analizarNoticias = async function() {
-    const btn = document.getElementById('btnAnalizarNoticias');
-    const status = document.getElementById('status-noticias');
-    
-    const articulos = [];
-    for (let i = 1; i <= noticiaCount; i++) {
-        const texto = document.getElementById(`articulo-${i}`)?.value.trim();
-        const link = document.getElementById(`link-${i}`)?.value.trim();
-        if (texto) articulos.push({ texto, link });
+window.analizarTodas = async function() {
+    const btn = document.getElementById('btnAnalizar');
+    const status = document.getElementById('status');
+    const items = document.querySelectorAll('.noticia-item');
+    if (items.length === 0) return alert('Agrega al menos una noticia.');
+
+    const noticias = [];
+    let valido = true;
+    items.forEach(item => {
+        const id = item.id.replace('noticia-', '');
+        const link = document.getElementById(`link-${id}`)?.value.trim() || '';
+        const texto = document.getElementById(`articulo-${id}`)?.value.trim() || '';
+        if (!texto) { document.getElementById(`articulo-${id}`).classList.add('border-red-500'); valido = false; } 
+        else { document.getElementById(`articulo-${id}`).classList.remove('border-red-500'); }
+        noticias.push({ link, texto });
+    });
+    if (!valido) return alert('Pega el texto en todas las fuentes.');
+
+    if (btn) { btn.disabled = true; btn.classList.add('opacity-50'); }
+    reportes = [];
+
+    for (let i = 0; i < noticias.length; i++) {
+        if (status) status.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-teal"></i> Analizando fuente ${i + 1} de ${noticias.length}...`;
+        try {
+            const res = await fetch('/api/analizar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ articulos: [noticias[i].texto] })
+            });
+            if (!res.ok) throw new Error("Error en el servidor");
+            const result = await res.json();
+            result._link = noticias[i].link;
+            reportes.push(result);
+        } catch (e) {
+            alert(`Error procesando fuente ${i + 1}: ${e.message}`);
+            if (btn) { btn.disabled = false; btn.classList.remove('opacity-50'); }
+            if (status) status.textContent = '';
+            return;
+        }
     }
 
-    if (articulos.length === 0) return alert("Por favor, ingresa contenido a analizar.");
+    if (status) status.textContent = '';
+    if (btn) { btn.disabled = false; btn.classList.remove('opacity-50'); }
+    
+    contextoReporteActual = reportes[0];
+    
+    // Cambiar a la vista del reporte y mostrar asistente flotante
+    renderTodosReportes();
+    window.navegarA('view-reporte');
+    document.getElementById('asistente-flotante').classList.remove('hidden');
+};
 
-    btn.disabled = true; btn.classList.add('opacity-50');
-    status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-teal"></i> Analizando e investigando...';
+window.volverNoticias = function() {
+    window.navegarA('view-noticias');
+    document.getElementById('asistente-flotante').classList.add('hidden');
+    document.getElementById('panel-chat').classList.add('hidden'); // Cerrar chat si estaba abierto
+};
 
-    try {
-        const res = await fetch('/api/analizar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ articulos: articulos.map(a => a.texto) })
-        });
-
-        if (!res.ok) throw new Error("Error en el servidor");
-        const data = await res.json();
-        
-        // Guardar para exportación y chat
-        data._link = articulos[0].link;
-        reportes = [data]; 
-        contextoReporteActual = data; 
-        
-        document.getElementById('reporte-noticias').classList.remove('hidden');
-        renderizarInforme();
-        
-        document.getElementById('chat-historial').innerHTML = `<div class="text-center text-teal text-xs mb-3 border-b pb-2">Contexto cargado. Asistente listo.</div>`;
-        status.textContent = '¡Análisis completado!';
-    } catch (error) {
-        status.innerHTML = '<span class="text-red-500">Error en el análisis.</span>';
-    } finally {
-        btn.disabled = false; btn.classList.remove('opacity-50');
+window.toggleChat = function() {
+    const panel = document.getElementById('panel-chat');
+    if (panel.classList.contains('hidden')) {
+        panel.classList.remove('hidden');
+        panel.style.display = 'flex';
+    } else {
+        panel.classList.add('hidden');
+        panel.style.display = 'none';
     }
 };
 
 // ==========================================
-// 3. RENDERIZADO DEL INFORME (Estilo V1 con Tailwind)
+// RENDERIZADO IDÉNTICO A VERSIÓN 1 CON FORZADO DE COLOR PDF
 // ==========================================
-function renderizarInforme() {
-    const data = reportes[0];
-    if (!data) return;
+function renderTodosReportes() {
+    const cont = document.getElementById('reportes-container');
+    if (!cont) return;
+    cont.innerHTML = '';
+    reportes.forEach((data, ri) => {
+        const bloque = document.createElement('div');
+        bloque.className = 'reporte-bloque mb-10';
+        bloque.id = `reporte-${ri}`;
+        bloque.innerHTML = buildReporteHTML(data, ri);
+        cont.appendChild(bloque);
+    });
+}
 
-    let hechosHTML = (data.hechos_clave || []).map(h => `<li class="mb-1">${h}</li>`).join('');
-    let fuentesHTML = (data.fuentes_consultadas || []).map(f => `<li class="truncate"><a href="${f}" target="_blank" class="text-blue-600 hover:underline">${f}</a></li>`).join('');
-    let personasHTML = (data.personas || []).map((p, pi) => buildPersonaHTML(p, pi)).join('');
+function resaltar(texto) {
+    if (!texto) return '';
+    return String(texto).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
 
-    document.getElementById('contenido-noticias').innerHTML = `
-        <div class="bg-navy text-white rounded-lg p-6 mb-6">
-            <h2 class="text-2xl font-bold mb-2">${data.titulo || 'Informe de Riesgo'}</h2>
-            <div class="flex flex-wrap gap-4 text-sm opacity-80">
-                <span><i class="fa-solid fa-calendar mr-1"></i> ${data.fecha || 'N/A'}</span>
-                <span><i class="fa-solid fa-location-dot mr-1"></i> ${data.lugar || 'N/A'}</span>
-                <span><i class="fa-solid fa-newspaper mr-1"></i> ${data.medio || 'N/A'}</span>
-            </div>
+function buildReporteHTML(data, ri) {
+    const personasHTML = (data.personas || []).map((p, pi) => buildPersonaHTML(p, ri, pi)).join('');
+    const iconos = {
+        cal: '<i class="fa-solid fa-calendar text-teal mr-1"></i>',
+        lug: '<i class="fa-solid fa-location-dot text-teal mr-1"></i>',
+        med: '<i class="fa-solid fa-newspaper text-teal mr-1"></i>'
+    };
+    
+    // NOTA: Se inyecta style="-webkit-print-color-adjust: exact;" para forzar los colores en el PDF
+    return `
+    <div class="cover bg-navy text-white rounded-xl p-8 mb-6 shadow-md" style="-webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: #0f1b2d !important; color: white !important;">
+        <h2 class="text-2xl font-extrabold mb-3">${data.titulo || '—'}</h2>
+        <div class="meta flex flex-wrap gap-5 text-sm opacity-90">
+            <span>${iconos.cal} ${data.fecha || 'No disponible'}</span>
+            <span>${iconos.lug} ${data.lugar || 'No disponible'}</span>
+            <span>${iconos.med} ${data.medio || 'No disponible'}</span>
         </div>
-
-        <div class="mb-6 bg-slate-50 border-l-4 border-gold p-4 rounded shadow-sm">
-            <h3 class="font-bold text-navy text-sm uppercase mb-2">Resumen General</h3>
-            <p class="text-sm text-slate-700 leading-relaxed">${data.resumen}</p>
-            <h3 class="font-bold text-navy text-sm uppercase mt-4 mb-2">Hechos Clave</h3>
-            <ul class="list-disc pl-5 text-sm text-slate-700 space-y-1">${hechosHTML}</ul>
-        </div>
-
-        <div id="personas-container">${personasHTML}</div>
-        
-        <button onclick="window.agregarPersonaUI()" class="no-print mt-2 bg-green-50 text-green-700 border border-green-300 px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-100">+ Agregar Involucrado Manual</button>
-
-        <div class="mt-6 pt-4 border-t">
-            <h3 class="font-bold text-navy text-sm uppercase mb-2">Fuentes Consultadas</h3>
-            <ul class="list-disc pl-5 text-sm text-slate-500">${fuentesHTML}</ul>
-        </div>
+        ${data._link ? `<div class="mt-4 text-xs opacity-70 break-all"><i class="fa-solid fa-link mr-1"></i> ${data._link}</div>` : ''}
+    </div>
+    <div class="resumen bg-white border border-slate-200 border-l-4 border-l-gold rounded-lg p-6 mb-6 shadow-sm" style="-webkit-print-color-adjust: exact; print-color-adjust: exact; border-left-color: #c9a227 !important;">
+        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Resumen general</h3>
+        <p class="text-sm text-navy leading-relaxed">${resaltar(data.resumen)}</p>
+        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mt-5 mb-2">Hechos clave</h3>
+        <ul class="list-disc pl-5 text-sm text-navy leading-relaxed space-y-1">${(data.hechos_clave || []).map(h => `<li>${resaltar(h)}</li>`).join('')}</ul>
+    </div>
+    <div id="personas-${ri}">${personasHTML}</div>
+    <button class="add-persona-btn no-print mt-2 bg-green-50 text-green-700 border border-green-300 px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-100 transition-colors" onclick="window.agregarPersona(${ri})">+ Agregar involucrado manualmente</button>
+    ${buildFuentesHTML(data.fuentes_consultadas)}
     `;
 }
 
-function buildPersonaHTML(p, pi) {
-    const badgeColor = p.nivel_riesgo_sugerido?.toLowerCase() === 'alto' ? 'bg-red-600' : (p.nivel_riesgo_sugerido?.toLowerCase() === 'bajo' ? 'bg-green-600' : 'bg-amber-600');
-    
+function buildFuentesHTML(fuentes) {
+    if (!fuentes || fuentes.length === 0) return '';
+    const items = fuentes.map(f => `<li class="truncate"><a href="${f}" target="_blank" class="text-teal hover:underline">${f}</a></li>`).join('');
     return `
-    <div class="persona-card bg-white border border-slate-200 rounded-lg p-5 mb-5 shadow-sm" id="persona-${pi}">
-        <div class="flex justify-between items-start mb-4 border-b pb-3">
-            <div>
-                <div class="font-bold text-lg text-navy" id="nombre-display-${pi}">${p.nombre || 'Desconocido'}</div>
-                <div class="text-xs text-slate-500">${p.cargo_o_actividad || ''}</div>
-            </div>
-            <div class="flex gap-2 items-center">
-                <span class="px-3 py-1 rounded-full text-xs font-bold text-white uppercase ${badgeColor}">${p.nivel_riesgo_sugerido || 'Medio'}</span>
-                <button onclick="window.eliminarPersonaUI(${pi})" class="no-print text-red-500 hover:text-red-700"><i class="fa-solid fa-trash"></i></button>
-            </div>
-        </div>
-
-        <div class="text-sm text-slate-700 mb-4 space-y-2">
-            <p><strong>Hechos/Delitos:</strong> ${p.rol_en_hechos}</p>
-            <p><strong>Análisis de riesgo:</strong> ${p.analisis_riesgo}</p>
-            <p class="text-xs italic text-slate-500"><strong>Justificación:</strong> ${p.justificacion_riesgo}</p>
-        </div>
-
-        <!-- Campos de Edición Manual V1 (Solo visibles en pantalla) -->
-        <div class="no-print bg-slate-50 p-4 rounded-lg border border-slate-200 mt-4">
-            <h4 class="font-bold text-xs text-navy mb-3 uppercase">Completar Debida Diligencia</h4>
-            <div class="grid grid-cols-2 gap-4 mb-3">
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Tipo ID</label>
-                    <select id="tipo-${pi}" class="w-full border rounded p-2 text-sm" onchange="window.actualizarCard(${pi})">
-                        <option value="">Seleccionar...</option><option value="CC">CC</option><option value="NIT">NIT</option><option value="CE">CE</option><option value="Pasaporte">Pasaporte</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Número ID</label>
-                    <input type="text" id="num-${pi}" class="w-full border rounded p-2 text-sm" placeholder="Ej. 1000..." oninput="window.actualizarCard(${pi})">
-                </div>
-            </div>
-            <div class="flex gap-4 mb-3 text-sm font-bold text-slate-700">
-                <label><input type="checkbox" id="bcs-${pi}" onchange="window.actualizarCard(${pi})"> Cliente BCS</label>
-                <label><input type="checkbox" id="fid-${pi}" onchange="window.actualizarCard(${pi})"> Cliente Fiduciaria</label>
-            </div>
-            <div class="grid grid-cols-2 gap-4 mb-3">
-                <input type="text" id="prodbcs-${pi}" class="border rounded p-2 text-sm" placeholder="Productos BCS..." oninput="window.actualizarCard(${pi})">
-                <input type="text" id="prodfid-${pi}" class="border rounded p-2 text-sm" placeholder="Productos Fidu..." oninput="window.actualizarCard(${pi})">
-            </div>
-            <input type="text" id="nombre-edit-${pi}" value="${p.nombre || ''}" class="w-full border rounded p-2 text-sm mb-3" placeholder="Editar Nombre" oninput="document.getElementById('nombre-display-${pi}').textContent=this.value">
-            <textarea id="recom-${pi}" class="w-full border rounded p-2 text-sm h-16" placeholder="Recomendación del analista..." oninput="window.actualizarCard(${pi})"></textarea>
-        </div>
-
-        <!-- Renderizado de tabla y recomendación (Visible en PDF) -->
-        <div class="mt-4 overflow-x-auto">
-            <table class="w-full text-left text-xs border-collapse">
-                <thead><tr class="bg-navy text-white"><th class="p-2 border">TIPO ID</th><th class="p-2 border">NUMERO ID</th><th class="p-2 border">CTE BCS</th><th class="p-2 border">PROD BCS</th><th class="p-2 border">CTE FIDU</th><th class="p-2 border">PROD FIDU</th><th class="p-2 border">ESTADO</th></tr></thead>
-                <tbody id="tabla-body-${pi}">
-                    <tr><td class="p-2 border text-slate-400 italic">Pendiente</td><td class="p-2 border text-slate-400 italic">Pendiente</td><td class="p-2 border">No</td><td class="p-2 border text-slate-400">—</td><td class="p-2 border">No</td><td class="p-2 border text-slate-400">—</td><td class="p-2 border font-bold text-amber-700">${p.estado_proceso}</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <div id="recom-display-${pi}" class="hidden mt-3 p-3 bg-amber-50 border-l-4 border-amber-500 rounded text-xs text-amber-900"></div>
+    <div class="resumen fuentes-consultadas bg-white border border-slate-200 rounded-lg p-6 mt-6 shadow-sm">
+        <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Fuentes consultadas</h3>
+        <ul class="list-disc pl-5 text-sm space-y-1">${items}</ul>
     </div>`;
 }
 
-window.actualizarCard = function(pi) {
-    const tipo = document.getElementById(`tipo-${pi}`)?.value || '<span class="text-slate-400 italic">Pendiente</span>';
-    const num = document.getElementById(`num-${pi}`)?.value || '<span class="text-slate-400 italic">Pendiente</span>';
-    const bcs = document.getElementById(`bcs-${pi}`)?.checked ? 'Sí' : 'No';
-    const fid = document.getElementById(`fid-${pi}`)?.checked ? 'Sí' : 'No';
-    const prodbcs = document.getElementById(`prodbcs-${pi}`)?.value || '—';
-    const prodfid = document.getElementById(`prodfid-${pi}`)?.value || '—';
+function claseEstadoStyle(estado) {
+    const e = String(estado || '').toLowerCase();
+    if (e.includes('detenid')) return 'background-color: #b9770e !important; color: white !important;';
+    if (e.includes('conden')) return 'background-color: #b3261e !important; color: white !important;';
+    if (e.includes('prófug') || e.includes('profug')) return 'background-color: #6b21a8 !important; color: white !important;';
+    if (e.includes('fallec')) return 'background-color: #6b7280 !important; color: white !important;';
+    if (e.includes('asesin')) return 'background-color: #111827 !important; color: white !important;';
+    return 'background-color: #3b5b7a !important; color: white !important;';
+}
+
+function filaTablaHTML(tipo, num, bcs, fid, prodbcs, prodfid, estado) {
+    const tipoVal = tipo || '<span class="text-slate-400 italic">Pendiente</span>';
+    const numVal = num || '<span class="text-slate-400 italic">Pendiente</span>';
+    const bcsVal = bcs ? '<span class="font-bold text-green-700">✓ Sí</span>' : '<span class="text-slate-500">No</span>';
+    const fidVal = fid ? '<span class="font-bold text-green-700">✓ Sí</span>' : '<span class="text-slate-500">No</span>';
+    const estadoTxt = estado || 'Investigado';
+    return `
+    <tr class="bg-white border-b">
+        <td class="p-2 border font-semibold text-navy">${tipoVal}</td>
+        <td class="p-2 border text-navy">${numVal}</td>
+        <td class="p-2 border">${bcsVal}</td>
+        <td class="p-2 border text-navy">${prodbcs || '—'}</td>
+        <td class="p-2 border">${fidVal}</td>
+        <td class="p-2 border text-navy">${prodfid || '—'}</td>
+        <td class="p-2 border text-center"><span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider" style="-webkit-print-color-adjust: exact; print-color-adjust: exact; ${claseEstadoStyle(estadoTxt)}">${estadoTxt}</span></td>
+    </tr>`;
+}
+
+function buildPersonaHTML(p, ri, pi) {
+    const nivelRaw = String(p.nivel_riesgo_sugerido || 'medio').toLowerCase().trim();
+    let badgeStyle = 'background-color: #b9770e !important; color: white !important;'; // Medio
+    if (nivelRaw === 'alto') badgeStyle = 'background-color: #b3261e !important; color: white !important;'; // Alto
+    if (nivelRaw === 'bajo') badgeStyle = 'background-color: #2e7d32 !important; color: white !important;'; // Bajo
     
-    const tbody = document.getElementById(`tabla-body-${pi}`);
-    if(tbody) {
-        tbody.innerHTML = `<tr><td class="p-2 border font-semibold">${tipo}</td><td class="p-2 border">${num}</td><td class="p-2 border">${bcs}</td><td class="p-2 border">${prodbcs}</td><td class="p-2 border">${fid}</td><td class="p-2 border">${prodfid}</td><td class="p-2 border font-bold">${reportes[0].personas[pi].estado_proceso}</td></tr>`;
-    }
+    return `
+    <div class="persona-card bg-white border border-slate-200 rounded-xl p-6 mb-5 shadow-sm break-inside-avoid" id="persona-${ri}-${pi}" data-estado="${p.estado_proceso || 'Investigado'}">
+        <div class="flex justify-between items-start mb-4">
+            <div class="flex gap-4 items-center">
+                <div class="w-12 h-12 rounded-full bg-navy text-white flex items-center justify-center shadow" style="-webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: #0f1b2d !important;"><i class="fa-solid fa-user"></i></div>
+                <div>
+                    <div class="font-bold text-lg text-navy" id="nombre-display-${ri}-${pi}">${p.nombre || 'Sin identificar'}</div>
+                    <div class="text-xs text-slate-500">${p.cargo_o_actividad || ''}</div>
+                </div>
+            </div>
+            <div class="flex gap-3 items-center">
+                <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm" style="-webkit-print-color-adjust: exact; print-color-adjust: exact; ${badgeStyle}">${nivelRaw.toUpperCase()}</span>
+                <button class="no-print text-red-500 hover:text-red-700 bg-red-50 p-2 rounded" onclick="window.eliminarPersona(${ri}, ${pi})"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        </div>
+        
+        <div class="text-sm text-navy mb-5 space-y-2 leading-relaxed">
+            <div><strong class="text-slate-800">Hechos / Delitos:</strong> ${resaltar(p.rol_en_hechos)}</div>
+            <div><strong class="text-slate-800">Análisis de riesgo:</strong> ${resaltar(p.analisis_riesgo)}</div>
+            <div class="text-xs text-slate-500 italic mt-2"><strong class="text-slate-600">¿Por qué este nivel?</strong> ${resaltar(p.justificacion_riesgo) || 'No especificado'}</div>
+        </div>
 
-    const recomText = document.getElementById(`recom-${pi}`)?.value.trim();
-    const recomDisp = document.getElementById(`recom-display-${pi}`);
-    if(recomDisp) {
-        if(recomText) {
-            recomDisp.innerHTML = `<strong>Recomendación del analista:</strong> ${recomText}`;
-            recomDisp.classList.remove('hidden');
-        } else {
-            recomDisp.classList.add('hidden');
-        }
+        <div class="tabla-datos mt-4 overflow-x-auto rounded border">
+            <table class="w-full text-left text-xs">
+                <thead>
+                    <tr class="bg-slate-50 text-navy" style="-webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: #f8fafc !important;">
+                        <th class="p-2 border">TIPO ID</th><th class="p-2 border">NÚMERO ID</th><th class="p-2 border">CTE BCS</th><th class="p-2 border">PROD BCS</th><th class="p-2 border">CTE FIDU</th><th class="p-2 border">PROD FIDU</th><th class="p-2 border text-center">ESTADO</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-body-${ri}-${pi}">${filaTablaHTML('', '', false, false, '', '', p.estado_proceso)}</tbody>
+            </table>
+        </div>
+
+        <div class="recomendacion-box hidden mt-4 bg-amber-50 border-l-4 border-amber-500 p-4 rounded text-sm text-navy shadow-inner" id="recom-display-${ri}-${pi}" style="-webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: #fffbeb !important; border-left-color: #f59e0b !important;"></div>
+
+        <!-- Campos de edición exclusivos de pantalla (Desaparecen en PDF) -->
+        <div class="edit-fields no-print bg-slate-50 p-5 rounded-lg border border-slate-200 mt-5 shadow-inner">
+            <h4 class="font-bold text-xs text-navy mb-3 uppercase tracking-wider">Completar Debida Diligencia Manual</h4>
+            <div class="grid grid-cols-2 gap-4 mb-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Tipo de identificación *</label>
+                    <select id="tipo-${ri}-${pi}" class="w-full border border-slate-300 rounded p-2 text-sm focus:border-navy outline-none" onchange="window.actualizarTabla(${ri},${pi})">
+                        <option value="">Seleccionar...</option><option value="CC">Cédula de Ciudadanía</option><option value="CE">Cédula de Extranjería</option><option value="NIT">NIT</option><option value="Pasaporte">Pasaporte</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Número de identificación *</label>
+                    <input type="text" id="num-${ri}-${pi}" class="w-full border border-slate-300 rounded p-2 text-sm focus:border-navy outline-none" placeholder="Ej. 1000123456" oninput="window.actualizarTabla(${ri},${pi})">
+                </div>
+            </div>
+            <div class="flex gap-6 mb-3 text-sm font-bold text-slate-700">
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="bcs-${ri}-${pi}" onchange="window.actualizarTabla(${ri},${pi})"> Cliente Banco (BCS)</label>
+                <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="fid-${ri}-${pi}" onchange="window.actualizarTabla(${ri},${pi})"> Cliente Fiduciaria</label>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Productos BCS</label>
+                    <input type="text" id="prodbcs-${ri}-${pi}" class="w-full border border-slate-300 rounded p-2 text-sm focus:border-navy outline-none" placeholder="Ej. Cuenta de ahorros" oninput="window.actualizarTabla(${ri},${pi})">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Productos Fiduciaria</label>
+                    <input type="text" id="prodfid-${ri}-${pi}" class="w-full border border-slate-300 rounded p-2 text-sm focus:border-navy outline-none" placeholder="Ej. Fideicomiso X" oninput="window.actualizarTabla(${ri},${pi})">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="block text-xs font-bold text-slate-600 mb-1">Editar nombre del involucrado</label>
+                <input type="text" id="nombre-edit-${ri}-${pi}" value="${p.nombre || ''}" class="w-full border border-slate-300 rounded p-2 text-sm focus:border-navy outline-none" placeholder="Nombre completo" oninput="document.getElementById('nombre-display-${ri}-${pi}').textContent=this.value">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1">Recomendación del analista para el Comité</label>
+                <textarea id="recom-${ri}-${pi}" class="w-full border border-slate-300 rounded p-3 text-sm h-20 focus:border-navy outline-none" placeholder="Escribe tu recomendación..." oninput="window.actualizarRecomendacion(${ri},${pi})"></textarea>
+            </div>
+        </div>
+    </div>`;
+}
+
+window.actualizarTabla = function(ri, pi) {
+    const tipo = document.getElementById(`tipo-${ri}-${pi}`)?.value || '';
+    const num = document.getElementById(`num-${ri}-${pi}`)?.value || '';
+    const bcs = document.getElementById(`bcs-${ri}-${pi}`)?.checked || false;
+    const fid = document.getElementById(`fid-${ri}-${pi}`)?.checked || false;
+    const prodbcs = document.getElementById(`prodbcs-${ri}-${pi}`)?.value || '';
+    const prodfid = document.getElementById(`prodfid-${ri}-${pi}`)?.value || '';
+
+    const tbody = document.getElementById(`tabla-body-${ri}-${pi}`);
+    const card = document.getElementById(`persona-${ri}-${pi}`);
+    if (tbody && card) {
+        tbody.innerHTML = filaTablaHTML(tipo, num, bcs, fid, prodbcs, prodfid, card.dataset.estado);
     }
 };
 
-window.agregarPersonaUI = function() {
-    if(!reportes[0]) return;
-    const pi = reportes[0].personas.length;
-    const nueva = { nombre: 'Nuevo involucrado', rol_en_hechos: '', cargo_o_actividad: '', analisis_riesgo: '', estado_proceso: 'Investigado', justificacion_riesgo: '', nivel_riesgo_sugerido: 'medio' };
-    reportes[0].personas.push(nueva);
+window.actualizarRecomendacion = function(ri, pi) {
+    const texto = document.getElementById(`recom-${ri}-${pi}`)?.value.trim();
+    const disp = document.getElementById(`recom-display-${ri}-${pi}`);
+    if (!disp) return;
+    if (texto) {
+        disp.innerHTML = `<strong class="text-amber-900 block mb-1">Recomendación del analista:</strong> ${texto.replace(/\n/g, '<br>')}`;
+        disp.classList.remove('hidden');
+        disp.style.display = 'block';
+    } else {
+        disp.classList.add('hidden');
+        disp.style.display = 'none';
+    }
+};
+
+window.agregarPersona = function(ri) {
+    const personaVacia = { nombre: 'Nuevo involucrado', rol_en_hechos: '', cargo_o_actividad: '', analisis_riesgo: '', estado_proceso: 'Investigado', justificacion_riesgo: '', nivel_riesgo_sugerido: 'medio' };
+    if (!reportes[ri].personas) reportes[ri].personas = [];
+    const pi = reportes[ri].personas.length;
+    reportes[ri].personas.push(personaVacia);
+
+    const cont = document.getElementById(`personas-${ri}`);
     const div = document.createElement('div');
-    div.innerHTML = buildPersonaHTML(nueva, pi);
-    document.getElementById('personas-container').appendChild(div.firstElementChild);
+    div.innerHTML = buildPersonaHTML(personaVacia, ri, pi);
+    cont.appendChild(div.firstElementChild);
 };
 
-window.eliminarPersonaUI = function(pi) {
-    document.getElementById(`persona-${pi}`)?.remove();
+window.eliminarPersona = function(ri, pi) {
+    document.getElementById(`persona-${ri}-${pi}`)?.remove();
 };
 
-// ==========================================
-// 4. CHAT ASISTENTE & EXPORTACIONES
-// ==========================================
 window.enviarPregunta = async function() {
     const input = document.getElementById('chat-input');
     const pregunta = input.value.trim();
     if (!pregunta) return;
-    if (!contextoReporteActual) return alert("Analiza una noticia primero.");
+    if (!contextoReporteActual) return alert("Primero debes generar un reporte.");
 
     const historial = document.getElementById('chat-historial');
-    historial.innerHTML += `<div class="self-end bg-navy text-white px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2">${pregunta}</div>`;
+    historial.innerHTML += `<div class="self-end bg-navy text-white px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm">${pregunta}</div>`;
     input.value = '';
     
     const idTemp = 'temp-' + Date.now();
-    historial.innerHTML += `<div id="${idTemp}" class="self-start bg-slate-200 px-3 py-2 rounded-lg text-xs mb-2">...</div>`;
+    historial.innerHTML += `<div id="${idTemp}" class="self-start bg-slate-200 text-slate-500 px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm"><i class="fa-solid fa-ellipsis fa-fade"></i></div>`;
     historial.scrollTop = historial.scrollHeight;
 
     try {
@@ -257,35 +349,71 @@ window.enviarPregunta = async function() {
             body: JSON.stringify({ pregunta, contexto: contextoReporteActual })
         });
         const data = await res.json();
-        document.getElementById(idTemp).outerHTML = `<div class="self-start bg-slate-200 text-navy px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2">${data.respuesta}</div>`;
+        document.getElementById(idTemp).outerHTML = `<div class="self-start bg-white border border-slate-200 text-navy px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm">${data.respuesta}</div>`;
     } catch (error) {
-        document.getElementById(idTemp).outerHTML = `<div class="text-red-500 text-xs mb-2">Error de conexión.</div>`;
+        document.getElementById(idTemp).outerHTML = `<div class="self-start bg-red-50 text-red-600 px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm">Error de conexión.</div>`;
     }
+    historial.scrollTop = historial.scrollHeight;
 };
 
-window.exportarExcel = function(tipo) {
-    if (!reportes.length) return alert("No hay datos.");
+window.exportarExcel = function() {
+    let ok = true;
     const filas = [];
-    const data = reportes[0];
-    
-    document.querySelectorAll('.persona-card').forEach(card => {
-        const pi = card.id.split('-')[1];
-        filas.push({
-            'Origen': data.medio,
-            'Titular': data.titulo,
-            'Persona': document.getElementById(`nombre-edit-${pi}`)?.value || '',
-            'Tipo ID': document.getElementById(`tipo-${pi}`)?.value || '',
-            'Num ID': document.getElementById(`num-${pi}`)?.value || '',
-            'Cliente BCS': document.getElementById(`bcs-${pi}`)?.checked ? 'Sí' : 'No',
-            'Prod BCS': document.getElementById(`prodbcs-${pi}`)?.value || '',
-            'Cliente FIDU': document.getElementById(`fid-${pi}`)?.checked ? 'Sí' : 'No',
-            'Prod FIDU': document.getElementById(`prodfid-${pi}`)?.value || '',
-            'Estado': data.personas[pi].estado_proceso
+    const hoy = new Date().toLocaleDateString('es-CO');
+
+    reportes.forEach((data, ri) => {
+        (data.personas || []).forEach((p, pi) => {
+            const card = document.getElementById(`persona-${ri}-${pi}`);
+            if(!card) return;
+            const tipo = document.getElementById(`tipo-${ri}-${pi}`)?.value || '';
+            const num = document.getElementById(`num-${ri}-${pi}`)?.value || '';
+            
+            if (!tipo || !num.trim()) ok = false;
+
+            filas.push({
+                'Fecha Ingreso': hoy,
+                'Originador': data.medio || '',
+                'Enlace': data._link || (data.fuentes_consultadas || [])[0] || '',
+                'Titular': data.titulo || '',
+                'Personas involucradas': document.getElementById(`nombre-edit-${ri}-${pi}`)?.value || p.nombre || '',
+                'Tipo de Documento': tipo,
+                'N° Documento': num,
+                'Cliente de BCS': document.getElementById(`bcs-${ri}-${pi}`)?.checked ? 'Sí' : 'No',
+                'Producto en BCS': document.getElementById(`prodbcs-${ri}-${pi}`)?.value || '',
+                'Cliente de FIDU': document.getElementById(`fid-${ri}-${pi}`)?.checked ? 'Sí' : 'No',
+                'Producto en FIDU': document.getElementById(`prodfid-${ri}-${pi}`)?.value || '',
+                'Estado': p.estado_proceso || '',
+                'Fecha Respuesta': hoy,
+                'Tipo delito': p.rol_en_hechos || ''
+            });
         });
     });
+
+    if (!ok) return alert("Completa el Tipo y Número de identificación de todos los involucrados antes de exportar.");
+    if (filas.length === 0) return alert('No hay datos.');
 
     const ws = XLSX.utils.json_to_sheet(filas);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "SARLAFT");
-    XLSX.writeFile(wb, "Reporte_SARLAFT.xlsx");
+    XLSX.writeFile(wb, `Reporte_SARLAFT_${hoy.replace(/\//g, '-')}.xlsx`);
+};
+
+window.exportarPDF = function() {
+    let ok = true;
+    document.querySelectorAll('.persona-card').forEach(card => {
+        const [ri, pi] = card.id.replace('persona-', '').split('-');
+        if (!document.getElementById(`tipo-${ri}-${pi}`)?.value || !document.getElementById(`num-${ri}-${pi}`)?.value.trim()) ok = false;
+    });
+    if (!ok) return alert("Completa el Tipo y Número de identificación de todos los involucrados antes de exportar el PDF.");
+
+    const tituloOriginal = document.title;
+    document.title = (reportes[0]?.titulo || "Informe_SARLAFT").replace(/[^\w]/g, "_");
+    
+    // Ocultar asistente al imprimir por seguridad adicional
+    document.getElementById('asistente-flotante').classList.add('hidden');
+    
+    window.print();
+    
+    document.title = tituloOriginal;
+    document.getElementById('asistente-flotante').classList.remove('hidden');
 };
