@@ -90,32 +90,121 @@ window.analizarCliente = async function () {
     }
 };
 
-function renderDashboardCliente(data) {
-    const perfil = document.getElementById('dash-perfil');
-    const alertas = document.getElementById('dash-alertas');
-    const resultado = document.getElementById('dashboard-resultado');
-    if (!perfil || !alertas || !resultado) return;
-
-    const score = typeof data.score_riesgo === 'number' ? data.score_riesgo : '—';
-    const ingresos = typeof data.ingresos_calculados === 'number'
-        ? data.ingresos_calculados.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
+function fmtMoneda(v) {
+    return typeof v === 'number'
+        ? v.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
         : '—';
+}
 
-    perfil.innerHTML = `
-        <div class="flex items-center justify-between mb-3">
-            <span class="text-slate-500">Score de riesgo</span>
-            <span class="font-bold text-navy text-lg">${score} / 100</span>
-        </div>
-        <div class="flex items-center justify-between">
-            <span class="text-slate-500">Ingresos mensuales estimados</span>
-            <span class="font-bold text-navy">${ingresos}</span>
-        </div>
-    `;
+function campoCliente(etiqueta, valor) {
+    const v = (valor === null || valor === undefined || valor === '') ? '—' : valor;
+    return `<div><span class="block text-[11px] uppercase tracking-wide text-slate-400 font-semibold">${etiqueta}</span><span class="text-slate-800 font-medium">${v}</span></div>`;
+}
 
-    const lista = data.alertas || [];
-    alertas.innerHTML = lista.length
-        ? lista.map(a => `<li>${a}</li>`).join('')
-        : '<li class="text-slate-400 list-none pl-0">Sin alertas detectadas.</li>';
+function renderDashboardCliente(data) {
+    const resultado = document.getElementById('dashboard-resultado');
+    if (!resultado) return;
+
+    const cliente = data.cliente || {};
+    const score = typeof data.score_riesgo === 'number' ? data.score_riesgo : null;
+
+    // --- Score circular con semáforo ---
+    const circulo = document.getElementById('dash-score-circulo');
+    const nivelBadge = document.getElementById('dash-nivel-riesgo');
+    if (circulo) {
+        let color = '#6b7280', bg = '#f1f5f9';
+        if (score !== null) {
+            if (score >= 70) { color = '#2e7d32'; bg = '#eafaf0'; }
+            else if (score >= 40) { color = '#b9770e'; bg = '#fff7e6'; }
+            else { color = '#b3261e'; bg = '#fdecea'; }
+        }
+        circulo.style.borderColor = color;
+        circulo.style.color = color;
+        circulo.style.background = bg;
+        circulo.textContent = score !== null ? score : '—';
+    }
+    if (nivelBadge) {
+        const nivel = cliente.nivel_riesgo || (score !== null ? (score >= 70 ? 'BAJO' : score >= 40 ? 'MEDIO' : 'ALTO') : '—');
+        const nivelUp = String(nivel).toUpperCase();
+        const clases = nivelUp.includes('ALT') ? 'bg-red-100 text-red-700'
+            : nivelUp.includes('MED') ? 'bg-amber-100 text-amber-700'
+            : nivelUp.includes('BAJ') ? 'bg-green-100 text-green-700'
+            : 'bg-slate-100 text-slate-600';
+        nivelBadge.className = `text-xs font-bold px-3 py-1 rounded-full uppercase ${clases}`;
+        nivelBadge.textContent = `Riesgo ${nivelUp}`;
+    }
+
+    // --- Narrativa ---
+    const narrativa = document.getElementById('dash-narrativa');
+    if (narrativa) narrativa.textContent = data.analisis_narrativo || 'Sin análisis narrativo disponible.';
+
+    // --- Datos generales del cliente ---
+    const info = document.getElementById('dash-cliente-info');
+    if (info) {
+        info.innerHTML = [
+            campoCliente('Nombre', cliente.nombre),
+            campoCliente('Identificación', cliente.identificacion ? `${cliente.tipo_id || ''} ${cliente.identificacion}`.trim() : null),
+            campoCliente('Fecha de nacimiento', cliente.fecha_nacimiento),
+            campoCliente('Edad', cliente.edad),
+            campoCliente('Género', cliente.genero),
+            campoCliente('Lugar de nacimiento', cliente.lugar_nacimiento),
+            campoCliente('Estado civil', cliente.estado_civil),
+            campoCliente('Profesión', cliente.profesion),
+            campoCliente('Actividad económica', cliente.actividad_economica),
+            campoCliente('Dirección', cliente.direccion),
+            campoCliente('Teléfono', cliente.telefono),
+            campoCliente('Segmento', cliente.segmento),
+            campoCliente('Capacidad económica', cliente.capacidad_economica),
+            campoCliente('¿Es PEP?', cliente.es_pep === true ? 'Sí' : cliente.es_pep === false ? 'No' : null),
+        ].join('');
+    }
+
+    // --- Indicadores financieros ---
+    const financiero = document.getElementById('dash-financiero');
+    if (financiero) {
+        const items = [
+            ['Ingresos', data.ingresos_calculados],
+            ['Egresos', data.egresos_calculados],
+            ['Activos', data.valor_activos],
+            ['Pasivos', data.valor_pasivos],
+        ];
+        financiero.innerHTML = items.map(([label, val]) => `
+            <div class="panel-cristal p-4 rounded-2xl border border-slate-200/70 text-center">
+                <span class="block text-[11px] uppercase tracking-wide text-slate-400 font-semibold mb-1">${label}</span>
+                <span class="block text-navy font-bold text-sm">${fmtMoneda(val)}</span>
+            </div>`).join('');
+    }
+
+    // --- Productos ---
+    const productosBody = document.getElementById('dash-productos');
+    if (productosBody) {
+        const productos = data.productos || [];
+        productosBody.innerHTML = productos.length
+            ? productos.map(p => `<tr class="border-t border-slate-100"><td class="p-2 font-semibold text-navy">${p.tipo || '—'}</td><td class="p-2">${p.numero || '—'}</td><td class="p-2 text-slate-500">${p.detalle || '—'}</td></tr>`).join('')
+            : '<tr><td class="p-3 text-slate-400 text-center" colspan="3">Sin productos identificados.</td></tr>';
+    }
+
+    // --- Movimientos ---
+    const movimientosBody = document.getElementById('dash-movimientos');
+    if (movimientosBody) {
+        const movimientos = data.movimientos || [];
+        movimientosBody.innerHTML = movimientos.length
+            ? movimientos.map(m => {
+                const esCredito = (m.naturaleza || '').toLowerCase().startsWith('cred');
+                const colorValor = esCredito ? 'text-green-600' : 'text-red-600';
+                return `<tr class="border-t border-slate-100"><td class="p-2">${m.fecha || '—'}</td><td class="p-2 text-slate-600">${m.descripcion || '—'}</td><td class="p-2 text-right font-semibold ${colorValor}">${fmtMoneda(m.valor)}</td></tr>`;
+            }).join('')
+            : '<tr><td class="p-3 text-slate-400 text-center" colspan="3">Sin movimientos identificados.</td></tr>';
+    }
+
+    // --- Alertas ---
+    const alertas = document.getElementById('dash-alertas');
+    if (alertas) {
+        const lista = data.alertas || [];
+        alertas.innerHTML = lista.length
+            ? lista.map(a => `<li>${a}</li>`).join('')
+            : '<li class="text-slate-400 list-none pl-0">Sin alertas detectadas.</li>';
+    }
 
     resultado.classList.remove('hidden');
     resultado.scrollIntoView({ behavior: 'smooth', block: 'start' });

@@ -24,19 +24,41 @@ module.exports = async (req, res) => {
 
   const parts = [
     {
-      text: `Eres un analista de riesgo financiero SARLAFT. Analiza las siguientes imágenes de documentos de un cliente (pueden ser cédulas, estados financieros, certificados de ingresos). 
+      text: `Eres un analista senior de riesgo financiero SARLAFT/LAFT en Colombia. Vas a recibir varias capturas de pantalla (hasta 6) de sistemas bancarios internos de un mismo cliente: listas de vinculación, consulta de datos generales, consulta fiduciaria, movimientos, productos/cuentas y saldos.
 
-            Extrae la información y responde ÚNICA Y ESTRICTAMENTE con un objeto JSON válido con esta estructura: 
+Cruza y consolida TODA la información visible en las imágenes en un único perfil. Si un dato no aparece en ninguna imagen, usa null (no inventes datos). Los montos numéricos van sin símbolos ni separadores (solo dígitos).
 
-            { 
+Responde ÚNICA Y ESTRICTAMENTE con un objeto JSON válido (sin markdown, sin comentarios) con esta estructura exacta:
 
-                "score_riesgo": número del 0 al 100 (100 es bajo riesgo/excelente cliente), 
-
-                "ingresos_calculados": número entero con los ingresos mensuales estimados, 
-
-                "alertas": ["alerta 1", "alerta 2"] (si el documento expira pronto, o hay inconsistencias en nombres/montos) 
-
-            }`,
+{
+  "cliente": {
+    "nombre": string|null,
+    "identificacion": string|null,
+    "tipo_id": string|null,
+    "fecha_nacimiento": string|null,
+    "edad": number|null,
+    "genero": string|null,
+    "lugar_nacimiento": string|null,
+    "estado_civil": string|null,
+    "profesion": string|null,
+    "actividad_economica": string|null,
+    "direccion": string|null,
+    "telefono": string|null,
+    "segmento": string|null,
+    "nivel_riesgo": string|null,
+    "es_pep": boolean|null,
+    "capacidad_economica": string|null
+  },
+  "score_riesgo": number entre 0 y 100 (100 = bajo riesgo/excelente cliente),
+  "ingresos_calculados": number|null (ingresos mensuales estimados),
+  "egresos_calculados": number|null,
+  "valor_activos": number|null,
+  "valor_pasivos": number|null,
+  "analisis_narrativo": string (2 a 4 párrafos explicando el hallazgo: por qué se generó la alerta, coherencia entre el perfil transaccional y el económico, listas en las que aparece, y conclusión del analista, en tono profesional de informe SARLAFT),
+  "productos": [ { "tipo": string, "numero": string, "detalle": string|null } ],
+  "movimientos": [ { "fecha": string, "descripcion": string, "valor": number, "naturaleza": "credito"|"debito" } ],
+  "alertas": ["alerta 1", "alerta 2"] (inconsistencias, documentos próximos a vencer, listas restrictivas, operaciones inusuales, etc.)
+}`,
     },
   ];
 
