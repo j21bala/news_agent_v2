@@ -8,6 +8,12 @@ module.exports = async (req, res) => {
 
   const GEMINI_KEY = process.env.GEMINI_API_KEY;
 
+  if (!GEMINI_KEY) {
+    return res
+      .status(500)
+      .json({ error: "Falta configurar GEMINI_API_KEY en el servidor." });
+  }
+
   if (!imagenes || imagenes.length === 0) {
     return res
       .status(400)
@@ -36,12 +42,15 @@ module.exports = async (req, res) => {
 
   // Adjuntar cada imagen en formato base64
 
-  imagenes.forEach((base64Data) => {
+  imagenes.forEach((img) => {
+    // Soporta el formato nuevo { data, mimeType } y, por compatibilidad,
+    // strings sueltos en base64 (se asume jpeg en ese caso).
+    const data = typeof img === "string" ? img : img.data;
+    const mimeType = typeof img === "string" ? "image/jpeg" : (img.mimeType || "image/jpeg");
     parts.push({
       inline_data: {
-        mime_type: "image/jpeg",
-
-        data: base64Data,
+        mime_type: mimeType,
+        data,
       },
     });
   });
@@ -69,10 +78,11 @@ module.exports = async (req, res) => {
 
     return res.status(200).json(data);
   } catch (error) {
-    console.error(error);
+    const detalle = error.response?.data?.error?.message || error.message;
+    console.error("Error analizar-cliente:", detalle);
 
     return res
       .status(500)
-      .json({ error: "Error procesando los documentos del cliente." });
+      .json({ error: `Error procesando los documentos del cliente: ${detalle}` });
   }
 };

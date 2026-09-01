@@ -1,6 +1,6 @@
 // Lógica de "Cruce Masivo": preview de imágenes documentales y envío a /api/analizar-cliente
 
-let clienteImagenes = []; // { id, base64, nombre }
+let clienteImagenes = []; // { id, base64, nombre, mimeType }
 let clienteImgCount = 0;
 
 function leerArchivoBase64(file) {
@@ -34,13 +34,13 @@ window.mostrarPreviewImagenes = async function () {
             const base64 = await leerArchivoBase64(file);
             clienteImgCount++;
             const id = clienteImgCount;
-            clienteImagenes.push({ id, base64, nombre: file.name });
+            clienteImagenes.push({ id, base64, nombre: file.name, mimeType: file.type || 'image/jpeg' });
 
             const div = document.createElement('div');
             div.id = `img-cliente-${id}`;
             div.className = 'relative w-24 h-24 rounded-xl overflow-hidden border border-slate-200 shadow-sm group';
             div.innerHTML = `
-                <img src="data:image/jpeg;base64,${base64}" class="w-full h-full object-cover" alt="${file.name}">
+                <img src="data:${file.type || 'image/jpeg'};base64,${base64}" class="w-full h-full object-cover" alt="${file.name}">
                 <button type="button" onclick="window.quitarImagenCliente(${id})" class="absolute top-1 right-1 w-5 h-5 bg-navy/80 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
@@ -74,7 +74,7 @@ window.analizarCliente = async function () {
         const res = await fetch('/api/analizar-cliente', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imagenes: clienteImagenes.map(i => i.base64) })
+            body: JSON.stringify({ imagenes: clienteImagenes.map(i => ({ data: i.base64, mimeType: i.mimeType })) })
         });
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
