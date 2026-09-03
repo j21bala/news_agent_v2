@@ -1,4 +1,6 @@
-module.exports = async (req, res) => {
+const { protegerRuta } = require('./_auth');
+
+module.exports = protegerRuta(async (req, res) => {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
     const { articulos, link } = req.body;
@@ -172,4 +174,4 @@ ${contextoWeb || 'No se encontraron resultados web adicionales.'}`;
         const detalle = error && error.detalle ? error.detalle : (error.message || String(error));
         return res.status(status).json({ error: 'Fallo servidor', detalle });
     }
-};
+});

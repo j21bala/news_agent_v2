@@ -89,7 +89,7 @@ window.analizarTodas = async function() {
     for (let i = 0; i < noticias.length; i++) {
         if (status) status.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-teal"></i> Analizando fuente ${i + 1} de ${noticias.length}...`;
         try {
-            const res = await fetch('/api/analizar', {
+            const res = await SarlaftAuth.authFetch('/api/analizar', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ articulos: [noticias[i].texto], link: noticias[i].link })
@@ -360,7 +360,7 @@ window.enviarPregunta = async function() {
     historial.scrollTop = historial.scrollHeight;
 
     try {
-        const res = await fetch('/api/chat', {
+        const res = await SarlaftAuth.authFetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pregunta, contexto: contextoReporteActual })

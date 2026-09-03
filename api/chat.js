@@ -1,4 +1,6 @@
-module.exports = async (req, res) => {
+const { protegerRuta } = require('./_auth');
+
+module.exports = protegerRuta(async (req, res) => {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
     const { pregunta, contexto } = req.body;
@@ -82,4 +84,4 @@ module.exports = async (req, res) => {
     } catch (error) {
         return res.status(500).json({ error: 'Error de conexión' });
     }
-};
+});

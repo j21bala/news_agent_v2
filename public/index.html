@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -110,6 +111,14 @@
     <div id="view-menu" class="relative min-h-screen flex flex-col items-center justify-center p-6 fade-in overflow-hidden">
         <div id="escenario-landing" aria-hidden="true">
             <canvas id="data-bg-canvas"></canvas>
+        </div>
+
+        <div class="relative z-10 w-full flex justify-end px-4 mb-4">
+            <div class="flex items-center gap-3 bg-slate-800/60 border border-slate-700 rounded-full px-4 py-1.5 text-xs text-slate-300">
+                <i class="fa-solid fa-user-shield"></i>
+                <span id="usuario-actual">—</span>
+                <button onclick="SarlaftAuth.logout()" class="text-red-400 hover:text-red-300 font-semibold ml-2">Cerrar sesión</button>
+            </div>
         </div>
 
         <div class="relative z-10 text-center mb-16">
@@ -311,6 +320,8 @@
         </div>
     </div>
 
+    <script src="./js/auth.js"></script>
+    <script>SarlaftAuth.requireSession();</script>
     <script src="./js/data-network-bg.js"></script>
     <script src="./js/cliente.js"></script>
     <script src="./js/app.js"></script>

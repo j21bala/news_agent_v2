@@ -1,6 +1,7 @@
 const axios = require("axios");
+const { protegerRuta } = require("./_auth");
 
-module.exports = async (req, res) => {
+module.exports = protegerRuta(async (req, res) => {
   if (req.method !== "POST")
     return res.status(405).json({ error: "Método no permitido" });
 
@@ -107,4 +108,4 @@ Responde ÚNICA Y ESTRICTAMENTE con un objeto JSON válido (sin markdown, sin co
       .status(500)
       .json({ error: `Error procesando los documentos del cliente: ${detalle}` });
   }
-};
+});

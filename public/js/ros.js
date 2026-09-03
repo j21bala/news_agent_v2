@@ -11,7 +11,7 @@ async function generarInformeROS() {
   statusEl.textContent = 'Procesando informe con IA (Temperatura 0)...';
 
   try {
-    const res = await fetch('/api/generar-ros', {
+    const res = await SarlaftAuth.authFetch('/api/generar-ros', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ plantillaPrompt, textoDocumentos })

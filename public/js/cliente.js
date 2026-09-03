@@ -71,7 +71,7 @@ window.analizarCliente = async function () {
     if (status) status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-purple-600"></i> Analizando documentos...';
 
     try {
-        const res = await fetch('/api/analizar-cliente', {
+        const res = await SarlaftAuth.authFetch('/api/analizar-cliente', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ imagenes: clienteImagenes.map(i => ({ data: i.base64, mimeType: i.mimeType })) })
