@@ -13,22 +13,61 @@ module.exports = protegerRuta(async (req, res) => {
     let urlsEncontradas = [];
     let contextoWeb = "";
 
-    // ---- Helper: llamar a Groq ----
+    if (!textoLocal.trim() && !link) {
+        return res.status(400).json({ error: 'No se recibió texto de noticia ni enlace para analizar.' });
+    }
+
+    // ---- Cadena de modelos: si uno falla, prueba el siguiente ----
+    const MODELOS_GROQ = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'groq/compound-mini'];
+
+    // ---- Helper: llamar a Groq con respaldo entre modelos y reintento sin JSON mode ----
     async function groqChat(prompt, { json = true } = {}) {
-        const body = {
-            model: 'openai/gpt-oss-120b',
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0
-        };
-        if (json) body.response_format = { type: 'json_object' };
-        const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
-            body: JSON.stringify(body)
-        });
-        const d = await r.json();
-        if (!r.ok) throw { status: r.status, detalle: d };
-        return d.choices[0].message.content;
+        let ultimoError = 'Ningún modelo de Groq respondió.';
+        for (const modelo of MODELOS_GROQ) {
+            const variantes = json ? [true, false] : [false];
+            for (const usarJson of variantes) {
+                const body = {
+                    model: modelo,
+                    messages: [{ role: 'user', content: prompt }],
+                    temperature: 0
+                };
+                if (usarJson) body.response_format = { type: 'json_object' };
+
+                const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+                    body: JSON.stringify(body)
+                });
+                const d = await r.json().catch(() => ({}));
+
+                if (r.ok && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) {
+                    return d.choices[0].message.content;
+                }
+
+                ultimoError = d && d.error && d.error.message
+                    ? `${modelo}: ${d.error.message}`
+                    : `${modelo}: HTTP ${r.status}`;
+                console.error(`Groq falló (${modelo}, json=${usarJson}):`, JSON.stringify(d));
+
+                // Si la key no es válida, no tiene sentido seguir intentando
+                if (r.status === 401 || r.status === 403) {
+                    throw { status: 500, detalle: 'Groq rechazó la API Key. Revisa GROQ_API_KEY en Vercel.' };
+                }
+            }
+        }
+        throw { status: 502, detalle: ultimoError };
+    }
+
+    // ---- Helper: parsear JSON tolerante (soporta vallas de código y texto extra) ----
+    function extraerJSON(texto) {
+        if (!texto) throw new Error('Respuesta vacía de la IA.');
+        let limpio = String(texto).replace(/```(?:json)?/gi, '').trim();
+        const inicio = limpio.indexOf('{');
+        const fin = limpio.lastIndexOf('}');
+        if (inicio === -1 || fin === -1) {
+            throw new Error('La IA no devolvió JSON válido. Inicio de respuesta: ' + limpio.substring(0, 200));
+        }
+        return JSON.parse(limpio.slice(inicio, fin + 1));
     }
 
     // ---- Helper: buscar en Tavily ----
@@ -99,7 +138,7 @@ Incluye en "personas" a TODAS las personas naturales y funcionarios nombrados en
 
 Noticia: """${textoBase.substring(0, 3000)}"""`;
                 const raw = await groqChat(promptEntidades);
-                entidades = JSON.parse(raw);
+                entidades = extraerJSON(raw);
             } catch (e) {
                 console.error('Error extracción entidades:', e.message || e);
             }
@@ -165,13 +204,15 @@ Contexto web recopilado en internet (usa esto para completar nombres, cargos y e
 ${contextoWeb || 'No se encontraron resultados web adicionales.'}`;
 
         const rawFinal = await groqChat(promptFinal);
-        const jsonRespuesta = JSON.parse(rawFinal);
+        const jsonRespuesta = extraerJSON(rawFinal);
         jsonRespuesta.fuentes_consultadas = Array.from(new Set([...(jsonRespuesta.fuentes_consultadas || []), ...urlsEncontradas]));
 
         return res.status(200).json(jsonRespuesta);
     } catch (error) {
         const status = error && error.status ? error.status : 500;
-        const detalle = error && error.detalle ? error.detalle : (error.message || String(error));
-        return res.status(status).json({ error: 'Fallo servidor', detalle });
+        let detalle = error && error.detalle ? error.detalle : (error.message || String(error));
+        if (typeof detalle === 'object') detalle = JSON.stringify(detalle);
+        console.error('Error en /api/analizar:', status, detalle);
+        return res.status(status).json({ error: 'Fallo al analizar la noticia', detalle });
     }
 });

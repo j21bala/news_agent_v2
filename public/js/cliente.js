@@ -207,5 +207,259 @@ function renderDashboardCliente(data) {
     }
 
     resultado.classList.remove('hidden');
+
+    const botonesExportacion = document.getElementById('dashboard-export-buttons');
+    if (botonesExportacion) {
+        botonesExportacion.classList.remove('hidden');
+    }
+
     resultado.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+// ============================================================
+// EXPORTACIÓN DEL DASHBOARD COMO IMAGEN Y PDF
+// ============================================================
+
+function obtenerNombreArchivoDashboard(extension) {
+    const identificacion =
+        document.querySelector('#dash-cliente-info')?.textContent
+            ?.replace(/\s+/g, ' ')
+            .trim()
+            .substring(0, 40)
+            .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ_-]/g, '_');
+
+    const fecha = new Date().toISOString().slice(0, 10);
+
+    return `dashboard_cruce_masivo_${identificacion || 'cliente'}_${fecha}.${extension}`;
+}
+
+async function capturarDashboard() {
+    const dashboard = document.getElementById('dashboard-resultado');
+
+    if (!dashboard) {
+        throw new Error('No se encontró el dashboard para exportar.');
+    }
+
+    if (typeof html2canvas === 'undefined') {
+        throw new Error('No se pudo cargar el componente de exportación de imagen.');
+    }
+
+    const botonesExportacion = document.getElementById('dashboard-export-buttons');
+    const estabaOculto = dashboard.classList.contains('hidden');
+
+    if (estabaOculto) {
+        dashboard.classList.remove('hidden');
+    }
+
+    if (botonesExportacion) {
+        botonesExportacion.classList.add('hidden');
+    }
+
+    // Permite capturar completamente el contenido de las tablas
+    // aunque visualmente tengan scroll dentro de la aplicación.
+    const elementosConScroll = dashboard.querySelectorAll(
+        '.max-h-56, .max-h-64, .overflow-y-auto'
+    );
+
+    const estilosOriginales = [];
+
+    elementosConScroll.forEach(elemento => {
+        estilosOriginales.push({
+            elemento,
+            maxHeight: elemento.style.maxHeight,
+            height: elemento.style.height,
+            overflow: elemento.style.overflow,
+            overflowY: elemento.style.overflowY
+        });
+
+        elemento.style.maxHeight = 'none';
+        elemento.style.height = 'auto';
+        elemento.style.overflow = 'visible';
+        elemento.style.overflowY = 'visible';
+    });
+
+    // Permite que las fuentes y estilos terminen de renderizarse.
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    let canvas;
+
+    try {
+        canvas = await html2canvas(dashboard, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: false,
+            backgroundColor: '#eef1f5',
+            logging: false,
+            imageTimeout: 15000,
+            onclone: documentoClonado => {
+                const dashboardClonado =
+                    documentoClonado.getElementById('dashboard-resultado');
+
+                if (dashboardClonado) {
+                    dashboardClonado.classList.remove('hidden');
+                }
+
+                const botonesClonados =
+                    documentoClonado.getElementById('dashboard-export-buttons');
+
+                if (botonesClonados) {
+                    botonesClonados.remove();
+                }
+
+                const elementosClonados = documentoClonado.querySelectorAll(
+                    '.max-h-56, .max-h-64, .overflow-y-auto'
+                );
+
+                elementosClonados.forEach(elemento => {
+                    elemento.style.maxHeight = 'none';
+                    elemento.style.height = 'auto';
+                    elemento.style.overflow = 'visible';
+                    elemento.style.overflowY = 'visible';
+                });
+            }
+        });
+    } finally {
+        // Restaura los estilos originales del dashboard.
+        estilosOriginales.forEach(item => {
+            item.elemento.style.maxHeight = item.maxHeight;
+            item.elemento.style.height = item.height;
+            item.elemento.style.overflow = item.overflow;
+            item.elemento.style.overflowY = item.overflowY;
+        });
+
+        if (botonesExportacion) {
+            botonesExportacion.classList.remove('hidden');
+        }
+
+        if (estabaOculto) {
+            dashboard.classList.add('hidden');
+        }
+    }
+
+    return canvas;
+}
+
+window.descargarDashboardImagen = async function () {
+    const boton = document.querySelector(
+        '#dashboard-export-buttons button:first-child'
+    );
+
+    const textoOriginal = boton ? boton.innerHTML : '';
+
+    try {
+        if (boton) {
+            boton.disabled = true;
+            boton.classList.add('opacity-60');
+            boton.innerHTML =
+                '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Generando imagen...';
+        }
+
+        const canvas = await capturarDashboard();
+
+        canvas.toBlob(blob => {
+            if (!blob) {
+                alert('No se pudo crear la imagen.');
+                return;
+            }
+
+            const url = URL.createObjectURL(blob);
+            const enlace = document.createElement('a');
+
+            enlace.href = url;
+            enlace.download = obtenerNombreArchivoDashboard('png');
+            document.body.appendChild(enlace);
+            enlace.click();
+            enlace.remove();
+
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }, 'image/png');
+    } catch (error) {
+        console.error('Error exportando dashboard como imagen:', error);
+        alert(`No fue posible descargar la imagen: ${error.message}`);
+    } finally {
+        if (boton) {
+            boton.disabled = false;
+            boton.classList.remove('opacity-60');
+            boton.innerHTML = textoOriginal;
+        }
+    }
+};
+
+window.descargarDashboardPDF = async function () {
+    const boton = document.querySelector(
+        '#dashboard-export-buttons button:nth-child(2)'
+    );
+
+    const textoOriginal = boton ? boton.innerHTML : '';
+
+    try {
+        if (boton) {
+            boton.disabled = true;
+            boton.classList.add('opacity-60');
+            boton.innerHTML =
+                '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Generando PDF...';
+        }
+
+        const canvas = await capturarDashboard();
+
+        if (
+            !window.jspdf ||
+            typeof window.jspdf.jsPDF !== 'function'
+        ) {
+            throw new Error('No se pudo cargar el generador de PDF.');
+        }
+
+        const { jsPDF } = window.jspdf;
+
+        // Formato horizontal para conservar mejor el diseño del dashboard.
+        const pdf = new jsPDF({
+            orientation: 'landscape',
+            unit: 'mm',
+            format: 'a4',
+            compress: true
+        });
+
+        const anchoPagina = 297;
+        const altoPagina = 210;
+        const margen = 8;
+        const anchoDisponible = anchoPagina - margen * 2;
+
+        const relacion = canvas.height / canvas.width;
+        const altoImagenCompleta = anchoDisponible * relacion;
+
+        const altoDisponible = altoPagina - margen * 2;
+
+        // Si el dashboard ocupa varias páginas, se divide verticalmente.
+        const paginas = Math.ceil(altoImagenCompleta / altoDisponible);
+
+        for (let pagina = 0; pagina < paginas; pagina++) {
+            if (pagina > 0) {
+                pdf.addPage();
+            }
+
+            const posicionY = margen - pagina * altoDisponible;
+
+            pdf.addImage(
+                canvas.toDataURL('image/png', 1.0),
+                'PNG',
+                margen,
+                posicionY,
+                anchoDisponible,
+                altoImagenCompleta,
+                undefined,
+                'FAST'
+            );
+        }
+
+        pdf.save(obtenerNombreArchivoDashboard('pdf'));
+    } catch (error) {
+        console.error('Error exportando dashboard como PDF:', error);
+        alert(`No fue posible descargar el PDF: ${error.message}`);
+    } finally {
+        if (boton) {
+            boton.disabled = false;
+            boton.classList.remove('opacity-60');
+            boton.innerHTML = textoOriginal;
+        }
+    }
+};

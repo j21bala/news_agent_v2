@@ -7,6 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
         tailwind.config = {
@@ -266,6 +268,25 @@
                 </div>
             </div>
             <div id="dashboard-resultado" class="hidden fade-in space-y-6">
+
+                <!-- Botones de exportación del dashboard -->
+                <div id="dashboard-export-buttons" class="hidden no-print flex flex-wrap justify-end gap-3 mb-2">
+                    <button
+                        type="button"
+                        onclick="window.descargarDashboardImagen()"
+                        class="bg-green-700 hover:bg-green-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-colors">
+                        <i class="fa-solid fa-image mr-2"></i>
+                        Descargar imagen para Excel
+                    </button>
+
+                    <button
+                        type="button"
+                        onclick="window.descargarDashboardPDF()"
+                        class="bg-red-700 hover:bg-red-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-colors">
+                        <i class="fa-solid fa-file-pdf mr-2"></i>
+                        Descargar PDF
+                    </button>
+                </div>
 
                 <!-- Fila 1: Score/semáforo + Análisis narrativo -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
