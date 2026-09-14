@@ -1,12 +1,17 @@
 // Lógica de "Cruce Masivo": preview de imágenes documentales y envío a /api/analizar-cliente
 
-let clienteImagenes = []; // { id, base64, nombre, mimeType }
+let clienteImagenes = [];
 let clienteImgCount = 0;
 
 function leerArchivoBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(',')[1]); // sin el prefijo data:...;base64,
+
+        reader.onload = () => {
+            const resultado = String(reader.result || '');
+            resolve(resultado.split(',')[1]);
+        };
+
         reader.onerror = reject;
         reader.readAsDataURL(file);
     });
@@ -15,9 +20,13 @@ function leerArchivoBase64(file) {
 window.mostrarPreviewImagenes = async function () {
     const input = document.getElementById('clienteImagenes');
     const cont = document.getElementById('preview-imagenes');
-    if (!input || !cont || !input.files || input.files.length === 0) return;
+
+    if (!input || !cont || !input.files || input.files.length === 0) {
+        return;
+    }
 
     const disponibles = 6 - clienteImagenes.length;
+
     if (disponibles <= 0) {
         alert('Ya alcanzaste el máximo de 6 imágenes. Quita alguna para agregar otra.');
         input.value = '';
@@ -25,6 +34,7 @@ window.mostrarPreviewImagenes = async function () {
     }
 
     const archivos = Array.from(input.files).slice(0, disponibles);
+
     if (input.files.length > archivos.length) {
         alert(`Solo se agregaron ${archivos.length} imagen(es): el máximo es 6 en total.`);
     }
@@ -32,25 +42,46 @@ window.mostrarPreviewImagenes = async function () {
     for (const file of archivos) {
         try {
             const base64 = await leerArchivoBase64(file);
+
             clienteImgCount++;
+
             const id = clienteImgCount;
-            clienteImagenes.push({ id, base64, nombre: file.name, mimeType: file.type || 'image/jpeg' });
+
+            clienteImagenes.push({
+                id,
+                base64,
+                nombre: file.name,
+                mimeType: file.type || 'image/jpeg'
+            });
 
             const div = document.createElement('div');
+
             div.id = `img-cliente-${id}`;
             div.className = 'relative w-24 h-24 rounded-xl overflow-hidden border border-slate-200 shadow-sm group';
+
             div.innerHTML = `
-                <img src="data:${file.type || 'image/jpeg'};base64,${base64}" class="w-full h-full object-cover" alt="${file.name}">
-                <button type="button" onclick="window.quitarImagenCliente(${id})" class="absolute top-1 right-1 w-5 h-5 bg-navy/80 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <img
+                    src="data:${file.type || 'image/jpeg'};base64,${base64}"
+                    class="w-full h-full object-cover"
+                    alt="${file.name}"
+                >
+
+                <button
+                    type="button"
+                    onclick="window.quitarImagenCliente(${id})"
+                    class="absolute top-1 right-1 w-5 h-5 bg-navy/80 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             `;
+
             cont.appendChild(div);
-        } catch (e) {
-            console.error('Error leyendo imagen', e);
+        } catch (error) {
+            console.error('Error leyendo imagen:', error);
         }
     }
-    input.value = ''; // permite volver a elegir el mismo archivo si lo quitó y lo quiere reagregar
+
+    input.value = '';
 };
 
 window.quitarImagenCliente = function (id) {
@@ -67,83 +98,180 @@ window.analizarCliente = async function () {
         return;
     }
 
-    if (btn) { btn.disabled = true; btn.classList.add('opacity-50'); }
-    if (status) status.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-purple-600"></i> Analizando documentos...';
+    if (btn) {
+        btn.disabled = true;
+        btn.classList.add('opacity-50');
+    }
+
+    if (status) {
+        status.innerHTML = `
+            <i class="fa-solid fa-spinner fa-spin text-purple-600"></i>
+            Analizando documentos...
+        `;
+    }
 
     try {
         const res = await SarlaftAuth.authFetch('/api/analizar-cliente', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imagenes: clienteImagenes.map(i => ({ data: i.base64, mimeType: i.mimeType })) })
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                imagenes: clienteImagenes.map(imagen => ({
+                    data: imagen.base64,
+                    mimeType: imagen.mimeType
+                }))
+            })
         });
+
         if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || 'Error en el servidor');
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.error || 'Error en el servidor');
         }
+
         const data = await res.json();
+
         renderDashboardCliente(data);
-    } catch (e) {
-        alert(`Error analizando documentos: ${e.message}`);
+    } catch (error) {
+        alert(`Error analizando documentos: ${error.message}`);
     } finally {
-        if (btn) { btn.disabled = false; btn.classList.remove('opacity-50'); }
-        if (status) status.textContent = '';
+        if (btn) {
+            btn.disabled = false;
+            btn.classList.remove('opacity-50');
+        }
+
+        if (status) {
+            status.textContent = '';
+        }
     }
 };
 
-function fmtMoneda(v) {
-    return typeof v === 'number'
-        ? v.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
+function fmtMoneda(valor) {
+    return typeof valor === 'number'
+        ? valor.toLocaleString('es-CO', {
+            style: 'currency',
+            currency: 'COP',
+            maximumFractionDigits: 0
+        })
         : '—';
 }
 
+function escaparHTML(valor) {
+    return String(valor ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function campoCliente(etiqueta, valor) {
-    const v = (valor === null || valor === undefined || valor === '') ? '—' : valor;
-    return `<div><span class="block text-[11px] uppercase tracking-wide text-slate-400 font-semibold">${etiqueta}</span><span class="text-slate-800 font-medium">${v}</span></div>`;
+    const valorSeguro =
+        valor === null ||
+        valor === undefined ||
+        valor === ''
+            ? '—'
+            : escaparHTML(valor);
+
+    return `
+        <div>
+            <span class="block text-[11px] uppercase tracking-wide text-slate-400 font-semibold">
+                ${escaparHTML(etiqueta)}
+            </span>
+            <span class="text-slate-800 font-medium">
+                ${valorSeguro}
+            </span>
+        </div>
+    `;
 }
 
 function renderDashboardCliente(data) {
     const resultado = document.getElementById('dashboard-resultado');
-    if (!resultado) return;
+
+    if (!resultado) {
+        return;
+    }
 
     const cliente = data.cliente || {};
-    const score = typeof data.score_riesgo === 'number' ? data.score_riesgo : null;
+    const score = typeof data.score_riesgo === 'number'
+        ? data.score_riesgo
+        : null;
 
-    // --- Score circular con semáforo ---
     const circulo = document.getElementById('dash-score-circulo');
     const nivelBadge = document.getElementById('dash-nivel-riesgo');
+
     if (circulo) {
-        let color = '#6b7280', bg = '#f1f5f9';
+        let color = '#6b7280';
+        let bg = '#f1f5f9';
+
         if (score !== null) {
-            if (score >= 70) { color = '#2e7d32'; bg = '#eafaf0'; }
-            else if (score >= 40) { color = '#b9770e'; bg = '#fff7e6'; }
-            else { color = '#b3261e'; bg = '#fdecea'; }
+            if (score >= 70) {
+                color = '#2e7d32';
+                bg = '#eafaf0';
+            } else if (score >= 40) {
+                color = '#b9770e';
+                bg = '#fff7e6';
+            } else {
+                color = '#b3261e';
+                bg = '#fdecea';
+            }
         }
+
         circulo.style.borderColor = color;
         circulo.style.color = color;
         circulo.style.background = bg;
         circulo.textContent = score !== null ? score : '—';
     }
+
     if (nivelBadge) {
-        const nivel = cliente.nivel_riesgo || (score !== null ? (score >= 70 ? 'BAJO' : score >= 40 ? 'MEDIO' : 'ALTO') : '—');
+        const nivel =
+            cliente.nivel_riesgo ||
+            (
+                score !== null
+                    ? score >= 70
+                        ? 'BAJO'
+                        : score >= 40
+                            ? 'MEDIO'
+                            : 'ALTO'
+                    : '—'
+            );
+
         const nivelUp = String(nivel).toUpperCase();
-        const clases = nivelUp.includes('ALT') ? 'bg-red-100 text-red-700'
-            : nivelUp.includes('MED') ? 'bg-amber-100 text-amber-700'
-            : nivelUp.includes('BAJ') ? 'bg-green-100 text-green-700'
-            : 'bg-slate-100 text-slate-600';
-        nivelBadge.className = `text-xs font-bold px-3 py-1 rounded-full uppercase ${clases}`;
+
+        const clases = nivelUp.includes('ALT')
+            ? 'bg-red-100 text-red-700'
+            : nivelUp.includes('MED')
+                ? 'bg-amber-100 text-amber-700'
+                : nivelUp.includes('BAJ')
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-slate-100 text-slate-600';
+
+        nivelBadge.className = `
+            text-xs font-bold px-3 py-1 rounded-full uppercase ${clases}
+        `;
+
         nivelBadge.textContent = `Riesgo ${nivelUp}`;
     }
 
-    // --- Narrativa ---
     const narrativa = document.getElementById('dash-narrativa');
-    if (narrativa) narrativa.textContent = data.analisis_narrativo || 'Sin análisis narrativo disponible.';
 
-    // --- Datos generales del cliente ---
+    if (narrativa) {
+        narrativa.textContent =
+            data.analisis_narrativo ||
+            'Sin análisis narrativo disponible.';
+    }
+
     const info = document.getElementById('dash-cliente-info');
+
     if (info) {
         info.innerHTML = [
             campoCliente('Nombre', cliente.nombre),
-            campoCliente('Identificación', cliente.identificacion ? `${cliente.tipo_id || ''} ${cliente.identificacion}`.trim() : null),
+            campoCliente(
+                'Identificación',
+                cliente.identificacion
+                    ? `${cliente.tipo_id || ''} ${cliente.identificacion}`.trim()
+                    : null
+            ),
             campoCliente('Fecha de nacimiento', cliente.fecha_nacimiento),
             campoCliente('Edad', cliente.edad),
             campoCliente('Género', cliente.genero),
@@ -155,82 +283,194 @@ function renderDashboardCliente(data) {
             campoCliente('Teléfono', cliente.telefono),
             campoCliente('Segmento', cliente.segmento),
             campoCliente('Capacidad económica', cliente.capacidad_economica),
-            campoCliente('¿Es PEP?', cliente.es_pep === true ? 'Sí' : cliente.es_pep === false ? 'No' : null),
+            campoCliente(
+                '¿Es PEP?',
+                cliente.es_pep === true
+                    ? 'Sí'
+                    : cliente.es_pep === false
+                        ? 'No'
+                        : null
+            )
         ].join('');
     }
 
-    // --- Indicadores financieros ---
     const financiero = document.getElementById('dash-financiero');
+
     if (financiero) {
         const items = [
             ['Ingresos', data.ingresos_calculados],
             ['Egresos', data.egresos_calculados],
             ['Activos', data.valor_activos],
-            ['Pasivos', data.valor_pasivos],
+            ['Pasivos', data.valor_pasivos]
         ];
-        financiero.innerHTML = items.map(([label, val]) => `
-            <div class="panel-cristal p-4 rounded-2xl border border-slate-200/70 text-center">
-                <span class="block text-[11px] uppercase tracking-wide text-slate-400 font-semibold mb-1">${label}</span>
-                <span class="block text-navy font-bold text-sm">${fmtMoneda(val)}</span>
-            </div>`).join('');
+
+        financiero.innerHTML = items
+            .map(([label, valor]) => `
+                <div class="panel-cristal p-4 rounded-2xl border border-slate-200/70 text-center">
+                    <span class="block text-[11px] uppercase tracking-wide text-slate-400 font-semibold mb-1">
+                        ${label}
+                    </span>
+
+                    <span class="block text-navy font-bold text-sm">
+                        ${fmtMoneda(valor)}
+                    </span>
+                </div>
+            `)
+            .join('');
     }
 
-    // --- Productos ---
     const productosBody = document.getElementById('dash-productos');
+
     if (productosBody) {
         const productos = data.productos || [];
+
         productosBody.innerHTML = productos.length
-            ? productos.map(p => `<tr class="border-t border-slate-100"><td class="p-2 font-semibold text-navy">${p.tipo || '—'}</td><td class="p-2">${p.numero || '—'}</td><td class="p-2 text-slate-500">${p.detalle || '—'}</td></tr>`).join('')
-            : '<tr><td class="p-3 text-slate-400 text-center" colspan="3">Sin productos identificados.</td></tr>';
+            ? productos
+                .map(producto => `
+                    <tr class="border-t border-slate-100">
+                        <td class="p-2 font-semibold text-navy">
+                            ${escaparHTML(producto.tipo || '—')}
+                        </td>
+
+                        <td class="p-2">
+                            ${escaparHTML(producto.numero || '—')}
+                        </td>
+
+                        <td class="p-2 text-slate-500">
+                            ${escaparHTML(producto.detalle || '—')}
+                        </td>
+                    </tr>
+                `)
+                .join('')
+            : `
+                <tr>
+                    <td class="p-3 text-slate-400 text-center" colspan="3">
+                        Sin productos identificados.
+                    </td>
+                </tr>
+            `;
     }
 
-    // --- Movimientos ---
     const movimientosBody = document.getElementById('dash-movimientos');
+
     if (movimientosBody) {
         const movimientos = data.movimientos || [];
+
         movimientosBody.innerHTML = movimientos.length
-            ? movimientos.map(m => {
-                const esCredito = (m.naturaleza || '').toLowerCase().startsWith('cred');
-                const colorValor = esCredito ? 'text-green-600' : 'text-red-600';
-                return `<tr class="border-t border-slate-100"><td class="p-2">${m.fecha || '—'}</td><td class="p-2 text-slate-600">${m.descripcion || '—'}</td><td class="p-2 text-right font-semibold ${colorValor}">${fmtMoneda(m.valor)}</td></tr>`;
-            }).join('')
-            : '<tr><td class="p-3 text-slate-400 text-center" colspan="3">Sin movimientos identificados.</td></tr>';
+            ? movimientos
+                .map(movimiento => {
+                    const esCredito = String(
+                        movimiento.naturaleza || ''
+                    )
+                        .toLowerCase()
+                        .startsWith('cred');
+
+                    const colorValor = esCredito
+                        ? 'text-green-600'
+                        : 'text-red-600';
+
+                    return `
+                        <tr class="border-t border-slate-100">
+                            <td class="p-2">
+                                ${escaparHTML(movimiento.fecha || '—')}
+                            </td>
+
+                            <td class="p-2 text-slate-600">
+                                ${escaparHTML(movimiento.descripcion || '—')}
+                            </td>
+
+                            <td class="p-2 text-right font-semibold ${colorValor}">
+                                ${fmtMoneda(movimiento.valor)}
+                            </td>
+                        </tr>
+                    `;
+                })
+                .join('')
+            : `
+                <tr>
+                    <td class="p-3 text-slate-400 text-center" colspan="3">
+                        Sin movimientos identificados.
+                    </td>
+                </tr>
+            `;
     }
 
-    // --- Alertas ---
     const alertas = document.getElementById('dash-alertas');
+
     if (alertas) {
         const lista = data.alertas || [];
+
         alertas.innerHTML = lista.length
-            ? lista.map(a => `<li>${a}</li>`).join('')
-            : '<li class="text-slate-400 list-none pl-0">Sin alertas detectadas.</li>';
+            ? lista
+                .map(alerta => `<li>${escaparHTML(alerta)}</li>`)
+                .join('')
+            : `
+                <li class="text-slate-400 list-none pl-0">
+                    Sin alertas detectadas.
+                </li>
+            `;
     }
 
     resultado.classList.remove('hidden');
 
-    const botonesExportacion = document.getElementById('dashboard-export-buttons');
+    const botonesExportacion = document.getElementById(
+        'dashboard-export-buttons'
+    );
+
     if (botonesExportacion) {
         botonesExportacion.classList.remove('hidden');
     }
 
-    resultado.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
+    resultado.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+    });
+};
 
 // ============================================================
 // EXPORTACIÓN DEL DASHBOARD COMO IMAGEN Y PDF
 // ============================================================
 
 function obtenerNombreArchivoDashboard(extension) {
-    const identificacion =
-        document.querySelector('#dash-cliente-info')?.textContent
-            ?.replace(/\s+/g, ' ')
-            .trim()
-            .substring(0, 40)
-            .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ_-]/g, '_');
+    const textoCliente =
+        document.querySelector('#dash-cliente-info')?.textContent || '';
+
+    const identificacion = textoCliente
+        .replace(/\s+/g, ' ')
+        .trim()
+        .substring(0, 40)
+        .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ_-]/g, '_');
 
     const fecha = new Date().toISOString().slice(0, 10);
 
     return `dashboard_cruce_masivo_${identificacion || 'cliente'}_${fecha}.${extension}`;
+}
+
+function aplicarEstilosExportacion(elemento) {
+    if (!elemento) {
+        return;
+    }
+
+    elemento.style.opacity = '1';
+    elemento.style.visibility = 'visible';
+    elemento.style.animation = 'none';
+    elemento.style.transition = 'none';
+    elemento.style.transform = 'none';
+    elemento.style.filter = 'none';
+}
+
+async function esperarRenderizadoCompleto() {
+    if (document.fonts && document.fonts.ready) {
+        await document.fonts.ready;
+    }
+
+    await new Promise(resolve => {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(resolve);
+        });
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 500));
 }
 
 async function capturarDashboard() {
@@ -244,27 +484,39 @@ async function capturarDashboard() {
         throw new Error('No se pudo cargar el componente de exportación de imagen.');
     }
 
-    const botonesExportacion = document.getElementById('dashboard-export-buttons');
+    const botonesExportacion = document.getElementById(
+        'dashboard-export-buttons'
+    );
+
     const estabaOculto = dashboard.classList.contains('hidden');
+
+    const estilosDashboard = {
+        opacity: dashboard.style.opacity,
+        visibility: dashboard.style.visibility,
+        animation: dashboard.style.animation,
+        transition: dashboard.style.transition,
+        transform: dashboard.style.transform,
+        filter: dashboard.style.filter
+    };
 
     if (estabaOculto) {
         dashboard.classList.remove('hidden');
     }
 
+    aplicarEstilosExportacion(dashboard);
+
     if (botonesExportacion) {
         botonesExportacion.classList.add('hidden');
     }
 
-    // Permite capturar completamente el contenido de las tablas
-    // aunque visualmente tengan scroll dentro de la aplicación.
     const elementosConScroll = dashboard.querySelectorAll(
         '.max-h-56, .max-h-64, .overflow-y-auto'
     );
 
-    const estilosOriginales = [];
+    const estilosOriginalesScroll = [];
 
     elementosConScroll.forEach(elemento => {
-        estilosOriginales.push({
+        estilosOriginalesScroll.push({
             elemento,
             maxHeight: elemento.style.maxHeight,
             height: elemento.style.height,
@@ -278,8 +530,7 @@ async function capturarDashboard() {
         elemento.style.overflowY = 'visible';
     });
 
-    // Permite que las fuentes y estilos terminen de renderizarse.
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await esperarRenderizadoCompleto();
 
     let canvas;
 
@@ -291,24 +542,35 @@ async function capturarDashboard() {
             backgroundColor: '#eef1f5',
             logging: false,
             imageTimeout: 15000,
+
             onclone: documentoClonado => {
                 const dashboardClonado =
                     documentoClonado.getElementById('dashboard-resultado');
 
                 if (dashboardClonado) {
                     dashboardClonado.classList.remove('hidden');
+
+                    dashboardClonado.style.opacity = '1';
+                    dashboardClonado.style.visibility = 'visible';
+                    dashboardClonado.style.animation = 'none';
+                    dashboardClonado.style.transition = 'none';
+                    dashboardClonado.style.transform = 'none';
+                    dashboardClonado.style.filter = 'none';
                 }
 
                 const botonesClonados =
-                    documentoClonado.getElementById('dashboard-export-buttons');
+                    documentoClonado.getElementById(
+                        'dashboard-export-buttons'
+                    );
 
                 if (botonesClonados) {
                     botonesClonados.remove();
                 }
 
-                const elementosClonados = documentoClonado.querySelectorAll(
-                    '.max-h-56, .max-h-64, .overflow-y-auto'
-                );
+                const elementosClonados =
+                    documentoClonado.querySelectorAll(
+                        '.max-h-56, .max-h-64, .overflow-y-auto'
+                    );
 
                 elementosClonados.forEach(elemento => {
                     elemento.style.maxHeight = 'none';
@@ -316,16 +578,33 @@ async function capturarDashboard() {
                     elemento.style.overflow = 'visible';
                     elemento.style.overflowY = 'visible';
                 });
+
+                documentoClonado
+                    .querySelectorAll('.fade-in')
+                    .forEach(elemento => {
+                        elemento.style.opacity = '1';
+                        elemento.style.visibility = 'visible';
+                        elemento.style.animation = 'none';
+                        elemento.style.transition = 'none';
+                        elemento.style.transform = 'none';
+                        elemento.style.filter = 'none';
+                    });
             }
         });
     } finally {
-        // Restaura los estilos originales del dashboard.
-        estilosOriginales.forEach(item => {
+        estilosOriginalesScroll.forEach(item => {
             item.elemento.style.maxHeight = item.maxHeight;
             item.elemento.style.height = item.height;
             item.elemento.style.overflow = item.overflow;
             item.elemento.style.overflowY = item.overflowY;
         });
+
+        dashboard.style.opacity = estilosDashboard.opacity;
+        dashboard.style.visibility = estilosDashboard.visibility;
+        dashboard.style.animation = estilosDashboard.animation;
+        dashboard.style.transition = estilosDashboard.transition;
+        dashboard.style.transform = estilosDashboard.transform;
+        dashboard.style.filter = estilosDashboard.filter;
 
         if (botonesExportacion) {
             botonesExportacion.classList.remove('hidden');
@@ -350,8 +629,10 @@ window.descargarDashboardImagen = async function () {
         if (boton) {
             boton.disabled = true;
             boton.classList.add('opacity-60');
-            boton.innerHTML =
-                '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Generando imagen...';
+            boton.innerHTML = `
+                <i class="fa-solid fa-spinner fa-spin mr-2"></i>
+                Generando imagen...
+            `;
         }
 
         const canvas = await capturarDashboard();
@@ -367,11 +648,14 @@ window.descargarDashboardImagen = async function () {
 
             enlace.href = url;
             enlace.download = obtenerNombreArchivoDashboard('png');
+
             document.body.appendChild(enlace);
             enlace.click();
             enlace.remove();
 
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+            }, 1000);
         }, 'image/png');
     } catch (error) {
         console.error('Error exportando dashboard como imagen:', error);
@@ -396,8 +680,10 @@ window.descargarDashboardPDF = async function () {
         if (boton) {
             boton.disabled = true;
             boton.classList.add('opacity-60');
-            boton.innerHTML =
-                '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Generando PDF...';
+            boton.innerHTML = `
+                <i class="fa-solid fa-spinner fa-spin mr-2"></i>
+                Generando PDF...
+            `;
         }
 
         const canvas = await capturarDashboard();
@@ -411,7 +697,6 @@ window.descargarDashboardPDF = async function () {
 
         const { jsPDF } = window.jspdf;
 
-        // Formato horizontal para conservar mejor el diseño del dashboard.
         const pdf = new jsPDF({
             orientation: 'landscape',
             unit: 'mm',
@@ -422,15 +707,19 @@ window.descargarDashboardPDF = async function () {
         const anchoPagina = 297;
         const altoPagina = 210;
         const margen = 8;
+
         const anchoDisponible = anchoPagina - margen * 2;
+        const altoDisponible = altoPagina - margen * 2;
 
         const relacion = canvas.height / canvas.width;
         const altoImagenCompleta = anchoDisponible * relacion;
 
-        const altoDisponible = altoPagina - margen * 2;
+        const paginas = Math.max(
+            1,
+            Math.ceil(altoImagenCompleta / altoDisponible)
+        );
 
-        // Si el dashboard ocupa varias páginas, se divide verticalmente.
-        const paginas = Math.ceil(altoImagenCompleta / altoDisponible);
+        const imagen = canvas.toDataURL('image/png', 1.0);
 
         for (let pagina = 0; pagina < paginas; pagina++) {
             if (pagina > 0) {
@@ -440,7 +729,7 @@ window.descargarDashboardPDF = async function () {
             const posicionY = margen - pagina * altoDisponible;
 
             pdf.addImage(
-                canvas.toDataURL('image/png', 1.0),
+                imagen,
                 'PNG',
                 margen,
                 posicionY,
