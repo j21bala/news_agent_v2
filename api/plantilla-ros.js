@@ -1,14 +1,17 @@
 // =============================================================================
 //  PLANTILLA BASE ROS  —  Definición única y centralizada
-//  El analista NO escribe plantilla. Solo carga evidencias y, si quiere,
-//  una instrucción puntual. Esta es la estructura obligatoria del informe.
-//  IMPORTANTE: aquí no hay datos de ejemplo. Todo se llena con las evidencias.
+//  Esta estructura refleja EXACTAMENTE la plantilla Word oficial
+//  (public/plantilla/Plantilla_ROS_base.docx). Si cambia la plantilla, hay que
+//  cambiar este esquema; si cambia este esquema, hay que cambiar la plantilla.
+//  Aquí no hay datos de ejemplo: todo se llena con las evidencias.
 // =============================================================================
 
 // Esquema JSON exacto que debe devolver el modelo.
-// Cualquier campo sin soporte documental -> "No documentado".
+// Cualquier campo sin soporte documental -> cadena vacía "" (NUNCA inventado).
 const ESQUEMA_ROS = {
-  encabezado: { marca: '', asunto: '', ciudad: '' },
+  asunto: '',
+  ciudad: '',
+  decision: { ros: false, archivo: false, gestion_comercial: false },
 
   descripcion_montos: {
     producto: '',
@@ -23,24 +26,71 @@ const ESQUEMA_ROS = {
         valor: ''
       }
     ],
-    tipologia: '',
-    criterios_objetivo: '',
+    total_reportar: '',
+    riesgos: '',
+    criterios_objetivos: '',
+    indicio: '',
     decision_comite: ''
   },
 
-  hechos: {
-    identificacion_sujetos: '',
-    antecedentes: '',
-    hechos_cronologicos: [''],
-    composicion_societaria: [
-      { tipo: '', numero: '', nombre: '', porcentaje: '', cliente: '' }
-    ],
-    junta_directiva_principales: [{ identificacion: '', nombre: '', cliente: '' }],
-    junta_directiva_suplentes: [{ identificacion: '', nombre: '', cliente: '' }],
-    gestion_comercial: ['']
+  hechos_cronologicos: '',
+
+  productos_titular: [
+    {
+      cliente: '',
+      id_cliente: '',
+      tipo_producto: '',
+      no_producto: '',
+      fecha_apertura: '',
+      estado: '',
+      nombre_oficina: '',
+      ciudad: '',
+      saldo: ''
+    }
+  ],
+
+  formulario_vinculacion: {
+    fecha_diligenciamiento: '',
+    ficha: {
+      tipo_id: '',
+      id_cliente: '',
+      fecha_creacion: '',
+      nombres_apellidos: '',
+      edad: '',
+      lugar_nacimiento: '',
+      fecha_nacimiento: '',
+      genero: '',
+      estado_civil: '',
+      actividad_economica: '',
+      nivel_riesgo_actividad: '',
+      ocupacion: '',
+      segmento_sarlaft: '',
+      perfil_riesgo_sarlaft: '',
+      empresa_empleadora: '',
+      profesion: '',
+      nivel_educativo: '',
+      ingresos: '',
+      direccion: '',
+      ciudad: '',
+      oficina_administra: '',
+      fecha_ultima_actualizacion: '',
+      egresos: '',
+      valor_activos: '',
+      valor_pasivos: '',
+      operaciones_internacionales: '',
+      importaciones: '',
+      exportaciones: '',
+      cambio_divisas: '',
+      origen_fondos: '',
+      origen_activos: ''
+    }
   },
 
+  gestion_comercial: '',
+  validaciones: '',
+
   comportamiento_transaccional: {
+    nombre_titular: '',
     producto: '',
     numero_producto: '',
     periodo: '',
@@ -64,19 +114,11 @@ const ESQUEMA_ROS = {
       pct_debito: ''
     },
     detalles: [
-      {
-        titulo: '',
-        narrativa: '',
-        columnas: [''],
-        filas: [['']],
-        total: ''
-      }
-    ],
-    observaciones: ['']
+      { letra: 'A', titulo: '', narrativa: '', filas: [], total: '' }
+    ]
   },
 
-  acumulados_mensuales: {
-    periodo: '',
+  acumulados: {
     filas: [
       {
         fecha: '',
@@ -95,141 +137,169 @@ const ESQUEMA_ROS = {
       debito: '',
       tx_debito: '',
       pct_debito: ''
-    }
+    },
+    conclusion: ''
   },
 
-  productos_involucrados: [
-    { producto: '', cuenta: '', tipo_transaccion: '', monto: '', institucion: '' }
-  ],
-
-  otros_productos: [
-    { producto: '', numero: '', fecha_apertura: '', estado: '' }
-  ],
-
-  tipo_cliente: {
-    tipo: '',
-    ficha: [{ campo: '', valor: '' }],
-    comparacion_sector: '',
-    fecha_actualizacion_datos: ''
-  },
+  tipo_cliente: { tipo: '', perfil_financiero: '', comparacion_sector: '' },
 
   reporte: { calificacion: '', urgencia: '' },
 
   caracteristicas_sospecha: [''],
-  conclusion_sospecha: '',
   metodologia: '',
   relacion_reportes_anteriores: '',
-  senales_alerta: [''],
+  senales_alerta: '',
   motivo_reporte: '',
-  informacion_soporte: ['']
+  informacion_soporte: [''],
+
+  // Trazabilidad: una entrada por campo diligenciado, con la ruta del campo
+  // como clave. NO se imprime en el Word; sirve para auditar el informe.
+  trazabilidad: {
+    'ruta.del.campo': { origen: 'evidencia|inferido|no_encontrado', archivo: '', pagina: '' }
+  }
 };
 
-// Nota legal fija: va siempre al final del ROS, textual.
+// Nota legal fija: ya está impresa en la plantilla Word. Se conserva aquí
+// porque la vista previa en pantalla la muestra al final del informe.
 const NOTA_LEGAL =
   'NOTA: Este informe se efectúa en desarrollo de las disposiciones legales, los acuerdos y ' +
   'convenios suscritos por el sector financiero con las autoridades, y el Código de conducta y ' +
   'Manual de Procedimientos del SARLAFT, en el entendimiento que los hechos relatados se sustentan ' +
   'en los perfiles generales fijados para las Operaciones sospechosas y no constituye denuncia de ' +
-  'un hecho ilícito. (Artículo 42 de la Ley 190 de 1995).';
+  'un hecho ilícito. Por lo tanto, nos encontramos amparados por la exoneración de responsabilidad ' +
+  'consagrada en el artículo 42 de la Ley 190 de 1995.';
 
-// Títulos oficiales de cada sección (los usa el render y el export a Word).
+// Títulos oficiales de cada sección, tal como aparecen en la plantilla Word.
 const SECCIONES = {
   s1: '1. DESCRIPCIÓN DE LOS HECHOS',
   s11: '1.1 HECHOS CRONOLÓGICOS',
-  s13: '1.3. COMPORTAMIENTO TRANSACCIONAL DEL PRINCIPAL',
-  s14: '1.4. PRODUCTOS FINANCIEROS INVOLUCRADOS, TIPOS DE TRANSACCIONES, MONTOS E INSTITUCIONES FINANCIERAS',
-  s141: '1.4.1 OTROS PRODUCTOS FINANCIEROS',
-  s2: '2. TIPO DE CLIENTE',
-  s21: '2.1 SI ES CLIENTE DEFINA',
-  s3: '3. REPORTE',
-  s4: '4. CARACTERÍSTICAS POR LAS CUALES SE HA CONSIDERADO LA OPERACIÓN COMO SOSPECHOSA',
-  s5: '5. METODOLOGÍA EMPLEADA PARA LA DETECCIÓN DE LA OPERACIÓN REPORTADA',
-  s6: '6. LA OPERACIÓN SOSPECHOSA SE RELACIONA CON ALGÚN REPORTE REALIZADO ANTERIORMENTE POR LA INSTITUCIÓN O CON OTRAS OPERACIONES',
-  s7: '7. SEÑAL DE ALERTA',
-  s8: '8. MOTIVO DEL REPORTE',
-  s9: '9. INFORMACIÓN SOPORTE DE LA OPERACIÓN REPORTADA'
+  s2: '2. PERSONAS NATURALES O JURÍDICAS VINCULADAS AL REPORTE QUE REGISTRA COMO TITULAR DE LOS SIGUIENTES PRODUCTOS',
+  s3: '3. INFORMACION FORMULARIO DE VINCULACIÓN Y/O ACTUALIZACION',
+  s4: '4. GESTION COMERCIAL POR PARTE DE LA OFICINA QUE ADMINISTRA LA RELACION',
+  s5: '5. VALIDACIONES Y HALLAZGOS COMPLEMENTARIOS DE LAS DIFERENTES FUENTES DE INFORMACIÓN',
+  s6: '6. COMPORTAMIENTO TRANSACCIONAL',
+  s7: 'ACUMULADOS Y PROMEDIOS DÉBITO Y CRÉDITO DEL PERIODO',
+  s8: 'TIPO DE CLIENTE',
+  s9: 'REPORTE',
+  s10: 'CARACTERÍSTICAS POR LAS CUALES SE HA CONSIDERADO LA OPERACIÓN COMO SOSPECHOSA',
+  s11b: 'METODOLOGÍA EMPLEADA PARA LA DETECCIÓN DE LA OPERACIÓN REPORTADA',
+  s12: 'LA OPERACIÓN SOSPECHOSA SE RELACIONA CON ALGÚN REPORTE REALIZADO ANTERIORMENTE',
+  s13: 'SEÑAL DE ALERTA',
+  s14: 'MOTIVO DEL REPORTE',
+  s15: 'INFORMACIÓN SOPORTE DE LA OPERACIÓN REPORTADA'
 };
 
-// Instrucciones de llenado, sección por sección. Describen QUÉ va en cada
-// campo, nunca CON QUÉ datos (esos salen exclusivamente de las evidencias).
+// Instrucciones de llenado. Describen QUÉ va en cada campo, nunca CON QUÉ
+// datos (esos salen exclusivamente de las evidencias).
 const GUIA_LLENADO = `
 ENCABEZADO
-- marca: entidad financiera que reporta.
-- asunto: decisión/propósito del caso (p. ej. "Caso para ROS", "Caso para ARCHIVO").
+- asunto: identificador del caso tal como aparezca en la documentación (p. ej. "RIS 00000").
 - ciudad: ciudad de la oficina donde se originó la alerta.
+- decision: marca con true UNA sola de las tres opciones (ros / archivo /
+  gestion_comercial), según la decisión que conste en el soporte del comité.
+  Si no consta, deja las tres en false.
 
-DESCRIPCIÓN DE MONTOS (tabla)
-- producto: tipo de producto alertado.
-- operaciones[]: una fila por operación alertada con numero de producto,
-  identificacion_titular, nombre_titular, oficina, fecha, transaccion y valor.
-- tipologia / criterios_objetivo: los que apliquen según la documentación; si no
-  hay, "NO APLICA".
-- decision_comite: decisión que conste en el acta o soporte del comité.
+DESCRIPCIÓN DE MONTOS
+- producto: tipo de producto alertado (se imprime como "Producto: <valor>").
+- operaciones[]: una fila por operación alertada. Usa exactamente estas claves:
+  numero, identificacion_titular, nombre_titular, oficina, fecha, transaccion, valor.
+- total_reportar: suma de los valores de operaciones[], solo si es verificable.
+- riesgos / criterios_objetivos / indicio: código y texto del riesgo, del
+  criterio objetivo y del indicio aplicados. Si no aplica, "NO APLICA".
+- decision_comite: decisión del comité. Puede llevar varias líneas separadas
+  por salto de línea (\\n).
 
-${SECCIONES.s1}
-- identificacion_sujetos: párrafo que identifica a la persona natural/jurídica
-  vinculada, su documento, producto, número, fecha de apertura y oficina.
-- antecedentes: resultado de consultas en listas y antecedentes.
-- hechos_cronologicos[]: párrafos en orden cronológico que expliquen por qué se
-  alertó la operación, con fechas, valores y fuentes documentales.
-- composicion_societaria[] y junta_directiva_*: solo si el sujeto es persona
-  jurídica y la información consta en certificado de existencia o base de datos.
-- gestion_comercial[]: transcripción resumida de la gestión de la oficina.
+${SECCIONES.s11}
+- hechos_cronologicos: uno o varios párrafos en orden cronológico que expliquen
+  por qué se alertó la operación, con fechas, valores y fuentes documentales.
+  Separa los párrafos con \\n.
 
-${SECCIONES.s13}
-- producto, numero_producto y periodo analizado.
-- resumen[]: una fila por tipo de transacción, separando crédito y débito, con
-  número de transacciones y participación porcentual. total_resumen cierra la tabla.
-- detalles[]: un bloque por cada transacción relevante del resumen, rotulado
-  (A), (B), (C)... con narrativa y una tabla propia (columnas + filas) cuyo
-  detalle dependa de la evidencia disponible (fecha, oficina, identificación,
-  nombre, dirección, teléfono, destino de recursos, valor, etc.).
-- observaciones[]: hallazgos sobre terceros (si son clientes, antecedentes,
-  vínculos), sin calificarlos sin evidencia.
-
-ACUMULADOS Y PROMEDIOS
-- filas[]: un renglón por mes del periodo con crédito, débito, número de
-  transacciones y porcentajes; total cierra la tabla.
-
-${SECCIONES.s14} / ${SECCIONES.s141}
-- Tablas de productos involucrados y otros productos del titular.
-
-${SECCIONES.s2} / ${SECCIONES.s21}
-- tipo: "Cliente" o "No cliente".
-- ficha[]: pares campo/valor tomados del formulario de vinculación o de la base
-  de datos (ID, razón social o nombre, matrícula, actividad económica, nivel de
-  riesgo, segmento, ingresos, egresos, activos, pasivos, dirección, teléfono,
-  ciudad, oficina, representante legal, etc.). Incluye únicamente los campos que
-  aparezcan en las evidencias.
-- comparacion_sector: perfil financiero frente a su sector.
-- fecha_actualizacion_datos: última actualización de datos.
+${SECCIONES.s2}
+- productos_titular[]: un renglón por producto del titular, con las claves
+  cliente, id_cliente, tipo_producto, no_producto, fecha_apertura, estado,
+  nombre_oficina, ciudad, saldo.
 
 ${SECCIONES.s3}
-- calificacion y urgencia: Alta / Media / Baja.
+- formulario_vinculacion.fecha_diligenciamiento: fecha del formulario de
+  vinculación o de la última actualización de datos.
+- formulario_vinculacion.ficha: la plantilla tiene 31 campos FIJOS. Diligencia
+  solo los que aparezcan en las evidencias y deja en "" los demás. NO agregues
+  campos nuevos: los que no estén en el esquema no se imprimen.
 
 ${SECCIONES.s4}
-- caracteristicas_sospecha[]: viñetas con los elementos objetivos que sustentan
-  (o desvirtúan) la sospecha, cada una anclada a un soporte documental.
-- conclusion_sospecha: párrafo de cierre que indique si se mantienen o se
-  desvirtúan los elementos de inusualidad.
+- gestion_comercial: transcripción resumida de la gestión de la oficina. Varios
+  párrafos separados por \\n.
 
 ${SECCIONES.s5}
-- metodologia: cómo se detectó la operación (herramientas SARLAFT, reporte de
-  oficina, tipología y criterio aplicados).
+- validaciones: resultado de consultas en listas restrictivas, antecedentes y
+  demás fuentes. Sin calificar conducta delictiva.
 
 ${SECCIONES.s6}
-- relacion_reportes_anteriores: "SI" con la referencia del reporte previo, o "NO".
+- nombre_titular, producto, numero_producto, periodo: encabezan la sección.
+- resumen[]: una fila por tipo de transacción, separando crédito y débito, con
+  número de transacciones y participación porcentual. Deja en "" las columnas
+  que no apliquen a esa fila. total_resumen cierra la tabla.
+- detalles[]: la plantilla tiene SIETE bloques de detalle fijos, rotulados de
+  (A) a (G). Entrega un objeto por bloque con:
+    letra: "A".."G"  (obligatorio, define en qué tabla de la plantilla cae)
+    titulo: nombre de la transacción del resumen que se está detallando
+    narrativa: párrafo explicativo (el bloque C no tiene narrativa impresa)
+    total: total del bloque
+    filas[]: usa SOLO las columnas que admite cada bloque:
+      A, B, D, F, G -> fecha, oficina, identificacion, nombre, valor
+      C             -> fecha, oficina, ciudad, valor
+      E             -> fecha, oficina, girado_a, identificacion, valor
+  Usa como máximo 7 bloques. Si hay menos transacciones relevantes, entrega
+  menos objetos: los bloques sobrantes quedarán vacíos.
 
 ${SECCIONES.s7}
-- senales_alerta[]: código y descripción textual de cada señal de alerta aplicada.
+- acumulados.filas[]: un renglón por mes del periodo con crédito, débito,
+  número de transacciones y porcentajes; acumulados.total cierra la tabla.
+- acumulados.conclusion: párrafo de lectura de la tendencia.
 
 ${SECCIONES.s8}
-- motivo_reporte: motivo del reporte; si no aplica, "NO APLICA".
+- tipo_cliente.tipo: "Cliente" o "No cliente".
+- tipo_cliente.perfil_financiero: perfil financiero que arroja la combinación
+  de variables.
+- tipo_cliente.comparacion_sector: comparación frente al sector económico.
 
 ${SECCIONES.s9}
-- informacion_soporte[]: lista de los soportes efectivamente adjuntados por el
+- reporte.calificacion y reporte.urgencia: Alta / Media / Baja.
+
+${SECCIONES.s10}
+- caracteristicas_sospecha[]: una viñeta por elemento objetivo que sustenta (o
+  desvirtúa) la sospecha, cada una anclada a un soporte documental.
+
+${SECCIONES.s11b}
+- metodologia: cómo se detectó la operación (herramientas SARLAFT, reporte de
+  oficina, riesgo y criterio aplicados).
+
+${SECCIONES.s12}
+- relacion_reportes_anteriores: "SI" con la referencia del reporte previo, o "NO".
+
+${SECCIONES.s13}
+- senales_alerta: código y descripción textual de cada señal de alerta. Si hay
+  varias, sepáralas con \\n.
+
+${SECCIONES.s14}
+- motivo_reporte: motivo del reporte; si no aplica, "NO APLICA".
+
+${SECCIONES.s15}
+- informacion_soporte[]: una entrada por soporte efectivamente adjuntado por el
   analista (reporte de operación inusual, perfilamiento, documentos de
-  vinculación, soportes de operaciones, formatos DOE, etc.).
+  vinculación, soportes de operaciones, etc.).
+
+TRAZABILIDAD
+- trazabilidad: un objeto cuyas claves son las rutas de los campos que
+  diligenciaste, p. ej. "descripcion_montos.operaciones[0].valor" o
+  "formulario_vinculacion.ficha.ingresos". Cada valor es
+  { origen, archivo, pagina }:
+    origen "evidencia"     -> el dato aparece literal en una evidencia
+    origen "inferido"      -> lo dedujiste de una o varias evidencias
+    origen "no_encontrado" -> no pudiste determinarlo (el campo va en "")
+  archivo y pagina identifican la evidencia; si no aplica, déjalos en "".
+  No hace falta una entrada por cada fila de una tabla larga: basta con una
+  entrada por tabla si todas las filas vienen de la misma evidencia.
 `;
 
 // Prompt de sistema completo que se envía al modelo.
@@ -244,16 +314,19 @@ secciones, no cambies los nombres de los campos.
 REGLAS CRÍTICAS
 1. Imparcialidad absoluta: describe hechos, no opiniones. No califiques ni
    presumas conducta delictiva.
-2. Cero alucinación: si un dato no figura en las evidencias, escribe exactamente
-   "No documentado". Nunca inventes nombres, cédulas, NIT, cuentas, fechas,
-   valores, porcentajes ni oficinas.
+2. Cero alucinación: si un dato no figura en las evidencias, deja el campo en
+   cadena vacía "". Nunca inventes nombres, cédulas, NIT, cuentas, fechas,
+   valores, porcentajes ni oficinas. Un campo vacío es correcto; un campo
+   inventado invalida el informe.
 3. Cifras y fechas se transcriben tal como aparecen en la evidencia (formato de
    moneda colombiana, p. ej. $1.234.567).
 4. Los porcentajes y totales solo se reportan si están en la evidencia o si son
    suma directa y verificable de las filas incluidas.
-5. Si una sección completa no aplica al caso, deja sus arreglos vacíos ([]) y sus
-   textos en "No documentado" o "NO APLICA" según corresponda.
+5. Si una sección completa no aplica al caso, deja sus arreglos vacíos ([]) y
+   sus textos en "".
 6. Redacta en español formal, en tercera persona, tiempo pasado.
+7. Respeta los nombres de clave del esquema al carácter. Los campos que no
+   estén en el esquema NO se imprimen en el documento final.
 
 GUÍA DE LLENADO DE LA PLANTILLA
 ${GUIA_LLENADO}

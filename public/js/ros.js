@@ -1,9 +1,11 @@
 // =============================================================================
 //  GENERADOR ROS  —  frontend
 //  El analista solo carga evidencias (+ instrucción opcional).
-//  La plantilla es fija y vive en /api/plantilla-ros.js.
-//  Este archivo: extrae texto de los archivos -> llama a la IA -> arma el
-//  informe con el formato exacto de la plantilla Word -> permite descargarlo.
+//  La plantilla es fija y vive en /api/plantilla-ros.js (esquema) y en
+//  /public/plantilla/Plantilla_ROS_base.docx (formato Word).
+//  Este archivo: extrae texto de los archivos -> llama a la IA -> muestra una
+//  VISTA PREVIA en pantalla. La descarga del Word la hace ros-docx.js
+//  rellenando la plantilla oficial (no reconstruye el documento).
 // =============================================================================
 
 (function () {
@@ -12,22 +14,26 @@
   let rosArchivosTexto = '';   // texto extraído de las evidencias
   let rosInformeActual = null; // último JSON devuelto por la IA
 
-  const VACIO = 'No documentado';
+  const VACIO = '';
   const NOTA_LEGAL_FALLBACK =
     'NOTA: Este informe se efectúa en desarrollo de las disposiciones legales, los acuerdos y ' +
     'convenios suscritos por el sector financiero con las autoridades, y el Código de conducta y ' +
     'Manual de Procedimientos del SARLAFT, en el entendimiento que los hechos relatados se sustentan ' +
     'en los perfiles generales fijados para las Operaciones sospechosas y no constituye denuncia de ' +
-    'un hecho ilícito. (Artículo 42 de la Ley 190 de 1995).';
+    'un hecho ilícito. Por lo tanto, nos encontramos amparados por la exoneración de responsabilidad ' +
+    'consagrada en el artículo 42 de la Ley 190 de 1995.';
 
   let notaLegalActual = NOTA_LEGAL_FALLBACK;
 
   // ---------------------------------------------------------------- utilidades
-  const esc = (v) => String(v === undefined || v === null || v === '' ? VACIO : v)
+  const esc = (v) => String(v === undefined || v === null ? VACIO : v)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   const arr = (v) => (Array.isArray(v) ? v.filter((x) => x !== null && x !== undefined) : []);
-  const obj = (v) => (v && typeof v === 'object' ? v : {});
+  const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+
+  // Texto que puede venir como string con \n o como arreglo de párrafos.
+  const bloque = (v) => (Array.isArray(v) ? v.join('\n') : String(v || ''));
 
   function status(msg) {
     const el = document.getElementById('status-ros');
@@ -139,7 +145,7 @@
       rosInformeActual = data.informe;
       notaLegalActual = data.notaLegal || NOTA_LEGAL_FALLBACK;
 
-      // 3) Render con el formato de la plantilla
+      // 3) Vista previa
       document.getElementById('contenido-ros').innerHTML = construirInformeHTML(rosInformeActual);
       document.getElementById('reporte-ros').classList.remove('hidden');
       const badge = document.getElementById('rosMotorBadge');
@@ -155,13 +161,16 @@
     }
   };
 
-  // --------------------------------------------------- render de la plantilla
+  // --------------------------------------------------- vista previa en pantalla
   const TB = 'width:100%;border-collapse:collapse;font-size:11px;margin:8px 0;';
   const TH = 'border:1px solid #999;padding:5px;background:#e9edf2;font-weight:bold;text-align:left;';
   const TD = 'border:1px solid #999;padding:5px;vertical-align:top;';
+  const H1 = 'font-size:13px;font-weight:bold;margin:18px 0 6px 0;text-transform:uppercase;';
+  const H2 = 'font-size:12px;font-weight:bold;margin:14px 0 6px 0;';
+  const SIN = '<p style="font-style:italic;color:#999;">(sin datos en las evidencias)</p>';
 
   function tabla(columnas, filas) {
-    if (!filas.length) return `<p style="${'font-style:italic;color:#666;'}">${VACIO}</p>`;
+    if (!filas.length) return SIN;
     const head = columnas.map((c) => `<th style="${TH}">${esc(c)}</th>`).join('');
     const body = filas
       .map((f) => `<tr>${f.map((c) => `<td style="${TD}">${esc(c)}</td>`).join('')}</tr>`)
@@ -169,38 +178,46 @@
     return `<table style="${TB}"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
   }
 
-  function parrafos(lista) {
-    const l = arr(lista).filter((t) => String(t).trim());
-    if (!l.length) return `<p>${VACIO}</p>`;
+  function parrafos(v) {
+    const l = bloque(v).split('\n').filter((t) => t.trim());
+    if (!l.length) return SIN;
     return l.map((t) => `<p style="text-align:justify;margin:6px 0;">${esc(t)}</p>`).join('');
   }
 
   function vinetas(lista) {
     const l = arr(lista).filter((t) => String(t).trim());
-    if (!l.length) return `<p>${VACIO}</p>`;
+    if (!l.length) return SIN;
     return `<ul style="margin:6px 0 6px 18px;">${l.map((t) => `<li style="margin-bottom:4px;text-align:justify;">${esc(t)}</li>`).join('')}</ul>`;
   }
 
-  const H1 = 'font-size:13px;font-weight:bold;margin:18px 0 6px 0;text-transform:uppercase;';
-  const H2 = 'font-size:12px;font-weight:bold;margin:14px 0 6px 0;';
+  const COLS_DETALLE = {
+    A: ['fecha', 'oficina', 'identificacion', 'nombre', 'valor'],
+    B: ['fecha', 'oficina', 'identificacion', 'nombre', 'valor'],
+    C: ['fecha', 'oficina', 'ciudad', 'valor'],
+    D: ['fecha', 'oficina', 'identificacion', 'nombre', 'valor'],
+    E: ['fecha', 'oficina', 'girado_a', 'identificacion', 'valor'],
+    F: ['fecha', 'oficina', 'identificacion', 'nombre', 'valor'],
+    G: ['fecha', 'oficina', 'identificacion', 'nombre', 'valor']
+  };
 
   function construirInformeHTML(d) {
     d = obj(d);
-    const enc = obj(d.encabezado);
     const dm = obj(d.descripcion_montos);
-    const h = obj(d.hechos);
+    const fv = obj(d.formulario_vinculacion);
+    const ficha = obj(fv.ficha);
     const ct = obj(d.comportamiento_transaccional);
-    const am = obj(d.acumulados_mensuales);
+    const ac = obj(d.acumulados);
     const tc = obj(d.tipo_cliente);
     const rp = obj(d.reporte);
+    const dec = obj(d.decision);
 
+    const chk = (v) => (v ? '☒' : '☐');
     let html = '';
 
     // ---------------- Encabezado
-    html += `
-      <p><b>Marca:</b> ${esc(enc.marca)}</p>
-      <p><b>Asunto:</b> ${esc(enc.asunto)}</p>
-      <p><b>Ciudad:</b> ${esc(enc.ciudad)}</p>`;
+    html += `<p><b>Asunto:</b> ${esc(d.asunto)}</p>`;
+    html += `<p>ROS ${chk(dec.ros)} &nbsp; ARCHIVO ${chk(dec.archivo)} &nbsp; GESTIÓN COMERCIAL ${chk(dec.gestion_comercial)}</p>`;
+    html += `<p><b>Ciudad:</b> ${esc(d.ciudad)}</p>`;
 
     // ---------------- Descripción de montos
     html += `<h4 style="${H2}">Descripción de Montos</h4>`;
@@ -209,153 +226,132 @@
       ['Numero', 'Identificación del titular', 'Nombre Titular', 'Oficina', 'Fecha', 'Transacción', 'Valor'],
       arr(dm.operaciones).map((o) => [o.numero, o.identificacion_titular, o.nombre_titular, o.oficina, o.fecha, o.transaccion, o.valor])
     );
-    html += tabla(
-      ['Tipología', 'Criterios objetivo', 'Decisión Comité'],
-      [[dm.tipologia, dm.criterios_objetivo, dm.decision_comite]]
-    );
+    html += `<p><b>Total a reportar:</b> ${esc(dm.total_reportar)}</p>`;
+    html += `<p><b>Riesgos:</b> ${esc(bloque(dm.riesgos))}</p>`;
+    html += `<p><b>Criterios objetivos:</b> ${esc(bloque(dm.criterios_objetivos))}</p>`;
+    html += `<p><b>Indicio:</b> ${esc(bloque(dm.indicio))}</p>`;
+    html += `<p><b>Decisión comité:</b> ${esc(bloque(dm.decision_comite))}</p>`;
 
     // ---------------- 1. Descripción de los hechos
     html += `<h3 style="${H1}">1. Descripción de los hechos</h3>`;
-    html += `<p style="font-style:italic;">Personas naturales o jurídicas vinculadas al reporte.</p>`;
-    html += `<p style="text-align:justify;">${esc(h.identificacion_sujetos)}</p>`;
-    html += `<p style="text-align:justify;">${esc(h.antecedentes)}</p>`;
-
     html += `<h4 style="${H2}">1.1 Hechos cronológicos</h4>`;
-    html += parrafos(h.hechos_cronologicos);
+    html += parrafos(d.hechos_cronologicos);
 
-    const soc = arr(h.composicion_societaria);
-    if (soc.length) {
-      html += `<h4 style="${H2}">Composición societaria</h4>`;
-      html += tabla(['Tipo', 'Numero', 'Nombre', 'Porcentaje', 'Cliente'],
-        soc.map((s) => [s.tipo, s.numero, s.nombre, s.porcentaje, s.cliente]));
-    }
+    // ---------------- 2. Productos del titular
+    html += `<h3 style="${H1}">2. Personas naturales o jurídicas vinculadas al reporte</h3>`;
+    html += tabla(
+      ['Cliente', 'Id. Cliente', 'Tipo Producto', 'No. producto', 'Fecha Apertura', 'Estado', 'Nombre oficina', 'Ciudad', 'Saldo'],
+      arr(d.productos_titular).map((p) => [p.cliente, p.id_cliente, p.tipo_producto, p.no_producto, p.fecha_apertura, p.estado, p.nombre_oficina, p.ciudad, p.saldo])
+    );
 
-    const jdp = arr(h.junta_directiva_principales);
-    const jds = arr(h.junta_directiva_suplentes);
-    if (jdp.length || jds.length) {
-      html += `<h4 style="${H2}">Junta directiva</h4>`;
-      if (jdp.length) {
-        html += `<p><b>Principales</b></p>`;
-        html += tabla(['Identificación', 'Nombre', 'Cliente'], jdp.map((j) => [j.identificacion, j.nombre, j.cliente]));
-      }
-      if (jds.length) {
-        html += `<p><b>Suplentes</b></p>`;
-        html += tabla(['Identificación', 'Nombre', 'Cliente'], jds.map((j) => [j.identificacion, j.nombre, j.cliente]));
-      }
-    }
+    // ---------------- 3. Formulario de vinculación
+    html += `<h3 style="${H1}">3. Información formulario de vinculación y/o actualización</h3>`;
+    html += `<p>Según el formulario de actualización de datos diligenciado el: ${esc(fv.fecha_diligenciamiento)}</p>`;
+    const filasFicha = Object.keys(ficha)
+      .filter((k) => String(ficha[k] || '').trim())
+      .map((k) => [k.replace(/_/g, ' '), ficha[k]]);
+    html += tabla(['Campo', 'Valor'], filasFicha);
 
-    html += `<h4 style="${H2}">Gestión comercial de la oficina</h4>`;
-    html += parrafos(h.gestion_comercial);
+    // ---------------- 4 y 5
+    html += `<h3 style="${H1}">4. Gestión comercial de la oficina</h3>`;
+    html += parrafos(d.gestion_comercial);
+    html += `<h3 style="${H1}">5. Validaciones y hallazgos complementarios</h3>`;
+    html += parrafos(d.validaciones);
 
-    // ---------------- 1.3 Comportamiento transaccional
-    html += `<h3 style="${H1}">1.3. Comportamiento transaccional del principal</h3>`;
-    html += `<p style="text-align:justify;">Movimiento transaccional del producto <b>${esc(ct.producto)}</b> No <b>${esc(ct.numero_producto)}</b>, durante el periodo <b><u>${esc(ct.periodo)}</u></b>, discriminado en débitos y créditos:</p>`;
+    // ---------------- 6. Comportamiento transaccional
+    html += `<h3 style="${H1}">6. Comportamiento transaccional ${esc(ct.nombre_titular)}</h3>`;
+    html += `<p style="text-align:justify;">Movimiento del producto <b>${esc(ct.producto)}</b> No <b>${esc(ct.numero_producto)}</b>, durante el periodo <b><u>${esc(ct.periodo)}</u></b>:</p>`;
 
     const filasRes = arr(ct.resumen).map((r) => [r.transaccion, r.credito, r.tx_credito, r.pct_credito, r.debito, r.tx_debito, r.pct_debito]);
     const tot = obj(ct.total_resumen);
-    if (Object.keys(tot).length) {
+    if (filasRes.length) {
       filasRes.push(['Total general', tot.credito, tot.tx_credito, tot.pct_credito, tot.debito, tot.tx_debito, tot.pct_debito]);
     }
     html += tabla(['Transacción', 'Crédito', 'Tx.', '%', 'Débito', 'Tx.', '%'], filasRes);
 
     arr(ct.detalles).forEach((det) => {
-      html += `<h4 style="${H2}">${esc(det.titulo)}</h4>`;
-      html += `<p style="text-align:justify;">${esc(det.narrativa)}</p>`;
-      const cols = arr(det.columnas);
-      const fls = arr(det.filas).map((f) => (Array.isArray(f) ? f : [f]));
-      if (cols.length && fls.length) {
-        if (det.total) fls.push(cols.map((_, i) => (i === cols.length - 1 ? det.total : (i === 0 ? 'Total' : ''))));
-        html += tabla(cols, fls);
-      }
+      const letra = String(det.letra || '').toUpperCase().replace(/[()]/g, '');
+      const cols = COLS_DETALLE[letra] || ['fecha', 'oficina', 'identificacion', 'nombre', 'valor'];
+      html += `<h4 style="${H2}">(${esc(letra)}) ${esc(det.titulo)}</h4>`;
+      if (bloque(det.narrativa).trim()) html += parrafos(det.narrativa);
+      const fls = arr(det.filas).map((f) => cols.map((c) => obj(f)[c]));
+      if (fls.length && det.total) fls.push(cols.map((_, i) => (i === 0 ? 'Total' : (i === cols.length - 1 ? det.total : ''))));
+      html += tabla(cols.map((c) => c.replace(/_/g, ' ')), fls);
     });
 
-    html += parrafos(ct.observaciones);
-
-    // ---------------- Acumulados mensuales
-    html += `<h4 style="${H2}">Acumulados y promedios débito y crédito del periodo <u>${esc(am.periodo || ct.periodo)}</u></h4>`;
-    const filasAM = arr(am.filas).map((r) => [r.fecha, r.credito, r.tx_credito, r.pct_credito, r.debito, r.tx_debito, r.pct_debito]);
-    const totAM = obj(am.total);
-    if (Object.keys(totAM).length) {
+    // ---------------- Acumulados
+    html += `<h3 style="${H1}">Acumulados y promedios débito y crédito del periodo</h3>`;
+    const filasAM = arr(ac.filas).map((r) => [r.fecha, r.credito, r.tx_credito, r.pct_credito, r.debito, r.tx_debito, r.pct_debito]);
+    const totAM = obj(ac.total);
+    if (filasAM.length) {
       filasAM.push(['Total general', totAM.credito, totAM.tx_credito, totAM.pct_credito, totAM.debito, totAM.tx_debito, totAM.pct_debito]);
     }
     html += tabla(['Fecha', 'Crédito', 'Tx.', '%', 'Débito', 'Tx.', '%'], filasAM);
+    html += parrafos(ac.conclusion);
 
-    // ---------------- 1.4 Productos
-    html += `<h3 style="${H1}">1.4. Productos financieros involucrados, tipos de transacciones, montos e instituciones financieras</h3>`;
-    html += tabla(['Producto', 'Cuenta', 'Tipo de Transacción', 'Monto', 'Institución'],
-      arr(d.productos_involucrados).map((p) => [p.producto, p.cuenta, p.tipo_transaccion, p.monto, p.institucion]));
-
-    html += `<h4 style="${H2}">1.4.1 Otros productos financieros</h4>`;
-    html += tabla(['Producto', 'Número', 'Fecha de apertura', 'Estado'],
-      arr(d.otros_productos).map((p) => [p.producto, p.numero, p.fecha_apertura, p.estado]));
-
-    // ---------------- 2. Tipo de cliente
-    html += `<h3 style="${H1}">2. Tipo de cliente</h3>`;
+    // ---------------- Tipo de cliente
+    html += `<h3 style="${H1}">Tipo de cliente</h3>`;
     html += `<p>${esc(tc.tipo)}</p>`;
-    html += `<h4 style="${H2}">2.1 Si es cliente defina:</h4>`;
-    html += `<p><b>a) Ingresos y egresos e información patrimonial</b></p>`;
-    html += tabla(['Campo', 'Valor'], arr(tc.ficha).map((f) => [f.campo, f.valor]));
-    html += `<p><b>b) Comparación del cliente con el sector económico al cual pertenece</b></p>`;
-    html += `<p style="text-align:justify;">${esc(tc.comparacion_sector)}</p>`;
-    html += `<p><b>c) Fecha de actualización de datos</b></p>`;
-    html += `<p>${esc(tc.fecha_actualizacion_datos)}</p>`;
+    html += `<p><b>a) Comparación del cliente con el sector económico al cual pertenece</b></p>`;
+    html += parrafos(tc.perfil_financiero);
+    html += parrafos(tc.comparacion_sector);
 
-    // ---------------- 3. Reporte
-    html += `<h3 style="${H1}">3. Reporte</h3>`;
+    // ---------------- Reporte
+    html += `<h3 style="${H1}">Reporte</h3>`;
     html += `<p><b>Calificación reporte:</b> ${esc(rp.calificacion)}</p>`;
     html += `<p><b>Urgencia:</b> ${esc(rp.urgencia)}</p>`;
 
-    // ---------------- 4 a 9
-    html += `<h3 style="${H1}">4. Características por las cuales se ha considerado la operación como sospechosa</h3>`;
+    // ---------------- Resto
+    html += `<h3 style="${H1}">Características por las cuales se ha considerado la operación como sospechosa</h3>`;
     html += vinetas(d.caracteristicas_sospecha);
-    html += `<p style="text-align:justify;">${esc(d.conclusion_sospecha)}</p>`;
 
-    html += `<h3 style="${H1}">5. Metodología empleada para la detección de la operación reportada</h3>`;
-    html += `<p style="text-align:justify;">${esc(d.metodologia)}</p>`;
+    html += `<h3 style="${H1}">Metodología empleada para la detección de la operación reportada</h3>`;
+    html += parrafos(d.metodologia);
 
-    html += `<h3 style="${H1}">6. La operación sospechosa se relaciona con algún reporte realizado anteriormente por la institución o con otras operaciones</h3>`;
+    html += `<h3 style="${H1}">La operación sospechosa se relaciona con algún reporte realizado anteriormente</h3>`;
     html += `<p>${esc(d.relacion_reportes_anteriores)}</p>`;
 
-    html += `<h3 style="${H1}">7. Señal de alerta</h3>`;
-    html += vinetas(d.senales_alerta);
+    html += `<h3 style="${H1}">Señal de alerta</h3>`;
+    html += parrafos(d.senales_alerta);
 
-    html += `<h3 style="${H1}">8. Motivo del reporte</h3>`;
-    html += `<p>${esc(d.motivo_reporte)}</p>`;
+    html += `<h3 style="${H1}">Motivo del reporte</h3>`;
+    html += parrafos(d.motivo_reporte);
 
-    html += `<h3 style="${H1}">9. Información soporte de la operación reportada</h3>`;
+    html += `<h3 style="${H1}">Información soporte de la operación reportada</h3>`;
     html += vinetas(d.informacion_soporte);
 
     html += `<p style="margin-top:22px;font-size:10px;text-align:justify;">${esc(notaLegalActual)}</p>`;
+
+    // ---------------- Trazabilidad (solo pantalla, no va al Word)
+    const tz = obj(d.trazabilidad);
+    const claves = Object.keys(tz);
+    if (claves.length) {
+      const noHallados = claves.filter((k) => obj(tz[k]).origen === 'no_encontrado');
+      const inferidos = claves.filter((k) => obj(tz[k]).origen === 'inferido');
+      html += `<h3 style="${H1}">Trazabilidad</h3>`;
+      html += `<p style="font-size:11px;">Campos con soporte documental: <b>${claves.length - noHallados.length - inferidos.length}</b> · inferidos: <b>${inferidos.length}</b> · no encontrados: <b>${noHallados.length}</b></p>`;
+      html += tabla(['Campo', 'Origen', 'Archivo', 'Página'],
+        claves.map((k) => [k, obj(tz[k]).origen, obj(tz[k]).archivo, obj(tz[k]).pagina]));
+    }
 
     return html;
   }
 
   // ----------------------------------------------------- exportar a Word (.docx)
-  window.descargarROSWord = function () {
+  // Ya NO se construye HTML: se rellena la plantilla oficial (ros-docx.js).
+  window.descargarROSWord = async function () {
     if (!rosInformeActual) return alert('Primero genera el informe.');
-
-    const cuerpo = document.getElementById('contenido-ros').innerHTML;
-    const html = `<!DOCTYPE html>
-<html xmlns:o="urn:schemas-microsoft-com:office:office"
-      xmlns:w="urn:schemas-microsoft-com:office:word"
-      xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="utf-8">
-<style>
-  @page { size: 21cm 29.7cm; margin: 2cm; }
-  body { font-family: Arial, sans-serif; font-size: 11pt; }
-  table { border-collapse: collapse; width: 100%; }
-  td, th { border: 1px solid #999999; padding: 4pt; font-size: 9pt; }
-  th { background-color: #e9edf2; }
-</style></head>
-<body>${cuerpo}</body></html>`;
-
-    const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
-    const a = document.createElement('a');
-    const marca = (rosInformeActual?.encabezado?.marca || 'ROS').replace(/[^\w]/g, '_');
-    a.href = URL.createObjectURL(blob);
-    a.download = `ROS_${marca}_${new Date().toISOString().slice(0, 10)}.doc`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    if (typeof window.generarROSDocx !== 'function') {
+      return alert('No se cargó el módulo de plantilla DOCX (ros-docx.js).');
+    }
+    try {
+      status('<i class="fa-solid fa-spinner fa-spin text-teal"></i> Rellenando la plantilla oficial...');
+      await window.generarROSDocx(rosInformeActual);
+      status('<span class="text-green-600 font-semibold">Documento generado ✓</span>');
+    } catch (e) {
+      status('');
+      alert(`No se pudo generar el Word: ${e.message}`);
+    }
   };
 
   // Compatibilidad con el nombre anterior.
