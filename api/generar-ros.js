@@ -34,7 +34,7 @@ module.exports = protegerRuta(async (req, res) => {
   if (GEMINI_KEY) {
     try {
       const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -62,7 +62,7 @@ module.exports = protegerRuta(async (req, res) => {
 
   // ---------- Intento 2: Groq (respaldo, cadena de modelos) ----------
   if (GROQ_KEY) {
-    const MODELOS_GROQ = ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile', 'openai/gpt-oss-20b'];
+    const MODELOS_GROQ = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'groq/compound-mini'];
     let ultimoError = 'Groq no respondió.';
 
     for (const modelo of MODELOS_GROQ) {
