@@ -81,7 +81,11 @@ module.exports = protegerRuta(async (req, res) => {
 
   const GEMINI_KEY = process.env.GEMINI_API_KEY;
   const GROQ_KEY = process.env.GROQ_API_KEY;
-  const GEMINI_MODELO = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  // "gemini-flash-latest" es el alias oficial que Google mantiene apuntando
+  // siempre al último Flash estable, así este código no se rompe cada vez que
+  // retiran una versión (p. ej. 2.5-flash: baja el 16/10/2026). Si prefieres
+  // fijar una versión concreta, defínela en GEMINI_MODEL en Vercel.
+  const GEMINI_MODELO = process.env.GEMINI_MODEL || 'gemini-flash-latest';
 
   const MAX_CHARS = 180000;
   const evidencias = String(textoDocumentos).slice(0, MAX_CHARS);
@@ -146,11 +150,12 @@ module.exports = protegerRuta(async (req, res) => {
 
   // ---------- Intento 2: Groq (respaldo) ----------
   if (GROQ_KEY) {
-    // compound-mini no admite response_format json_object: se marca aparte.
+    // compound-mini no admite response_format json_object y su tope real de
+    // salida es 8192 tokens (no 32768): se marca aparte para cada uno.
     const MODELOS_GROQ = [
-      { id: 'openai/gpt-oss-120b', json: true },
-      { id: 'openai/gpt-oss-20b', json: true },
-      { id: 'groq/compound-mini', json: false }
+      { id: 'openai/gpt-oss-120b', json: true, maxTokens: 65536 },
+      { id: 'openai/gpt-oss-20b', json: true, maxTokens: 65536 },
+      { id: 'groq/compound-mini', json: false, maxTokens: 8192 }
     ];
 
     for (const modelo of MODELOS_GROQ) {
@@ -159,7 +164,7 @@ module.exports = protegerRuta(async (req, res) => {
           model: modelo.id,
           messages: [{ role: 'user', content: prompt }],
           temperature: 0,
-          max_completion_tokens: 32768
+          max_completion_tokens: modelo.maxTokens
         };
         if (modelo.json) cuerpo.response_format = { type: 'json_object' };
 
