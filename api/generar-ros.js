@@ -1,20 +1,78 @@
 const { protegerRuta } = require('./_auth');
 const { construirPromptROS, NOTA_LEGAL } = require('./plantilla-ros');
 
-// Limpia cercas markdown y texto sobrante alrededor del JSON.
-function extraerJSON(texto) {
-  if (!texto) throw new Error('El motor devolvió una respuesta vacía.');
-  let limpio = String(texto).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
-  const ini = limpio.indexOf('{');
-  const fin = limpio.lastIndexOf('}');
-  if (ini === -1 || fin === -1) throw new Error('El motor no devolvió un JSON válido.');
-  return JSON.parse(limpio.slice(ini, fin + 1));
+// =============================================================================
+//  Extracción robusta del JSON devuelto por el modelo.
+//  El problema del método anterior (primer "{" ... último "}") es que si el
+//  modelo escribe CUALQUIER cosa con llaves después del JSON, o si la respuesta
+//  viene truncada, el corte resultante deja basura pegada al final y JSON.parse
+//  falla con "Unexpected non-whitespace character after JSON".
+//  Aquí se recorre el texto contando llaves y respetando comillas y escapes,
+//  para quedarnos con el PRIMER objeto de nivel superior completo.
+// =============================================================================
+function recortarObjeto(texto) {
+  const ini = texto.indexOf('{');
+  if (ini === -1) return null;
+
+  let profundidad = 0;
+  let enCadena = false;
+  let escapado = false;
+
+  for (let i = ini; i < texto.length; i++) {
+    const c = texto[i];
+
+    if (enCadena) {
+      if (escapado) escapado = false;
+      else if (c === '\\') escapado = true;
+      else if (c === '"') enCadena = false;
+      continue;
+    }
+
+    if (c === '"') enCadena = true;
+    else if (c === '{') profundidad++;
+    else if (c === '}') {
+      profundidad--;
+      if (profundidad === 0) return texto.slice(ini, i + 1); // objeto completo
+    }
+  }
+
+  return null; // se acabó el texto sin cerrar: respuesta truncada
+}
+
+function extraerJSON(texto, etiquetaMotor) {
+  if (!texto || !String(texto).trim()) {
+    throw new Error(`${etiquetaMotor} devolvió una respuesta vacía.`);
+  }
+
+  // Quita cercas markdown estén donde estén (no solo al inicio y al final).
+  const limpio = String(texto)
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim();
+
+  const bloque = recortarObjeto(limpio);
+
+  if (!bloque) {
+    throw new Error(
+      `${etiquetaMotor} devolvió un JSON incompleto (respuesta cortada a la mitad, ` +
+      `probablemente por límite de tokens). Longitud recibida: ${limpio.length} caracteres.`
+    );
+  }
+
+  try {
+    return JSON.parse(bloque);
+  } catch (e) {
+    const pos = Number((e.message.match(/position (\d+)/) || [])[1]);
+    const ctx = Number.isFinite(pos)
+      ? ` Contexto: ...${bloque.slice(Math.max(0, pos - 60), pos + 60)}...`
+      : '';
+    throw new Error(`${etiquetaMotor} devolvió un JSON inválido: ${e.message}.${ctx}`);
+  }
 }
 
 module.exports = protegerRuta(async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
-  // Ya NO se recibe plantillaPrompt: la plantilla vive en el servidor.
   const { textoDocumentos, instruccionesAnalista } = req.body || {};
 
   if (!textoDocumentos || !String(textoDocumentos).trim()) {
@@ -23,18 +81,20 @@ module.exports = protegerRuta(async (req, res) => {
 
   const GEMINI_KEY = process.env.GEMINI_API_KEY;
   const GROQ_KEY = process.env.GROQ_API_KEY;
+  const GEMINI_MODELO = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
-  // Recorte defensivo para no reventar el contexto del modelo.
   const MAX_CHARS = 180000;
   const evidencias = String(textoDocumentos).slice(0, MAX_CHARS);
-
   const prompt = construirPromptROS(evidencias, instruccionesAnalista);
 
-  // ---------- Intento 1: Gemini 2.0 Flash (temperatura 0, salida JSON) ----------
+  // Se acumulan los fallos para poder explicarlos si no responde ningún motor.
+  const fallos = [];
+
+  // ---------- Intento 1: Gemini ----------
   if (GEMINI_KEY) {
     try {
       const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODELO}:generateContent?key=${GEMINI_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -42,60 +102,109 @@ module.exports = protegerRuta(async (req, res) => {
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
               temperature: 0,
-              maxOutputTokens: 8192,
+              // Un ROS completo con tablas de movimientos supera con holgura los
+              // 8192 tokens: ese límite era la causa de las respuestas cortadas.
+              maxOutputTokens: 65536,
               responseMimeType: 'application/json'
             }
           })
         }
       );
 
-      if (!r.ok) throw new Error(`Gemini respondió ${r.status}`);
-      const data = await r.json();
-      const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      const informe = extraerJSON(texto);
+      if (!r.ok) {
+        const cuerpo = await r.text().catch(() => '');
+        throw new Error(`HTTP ${r.status}. ${cuerpo.slice(0, 300)}`);
+      }
 
-      return res.status(200).json({ informe, notaLegal: NOTA_LEGAL, motor: 'Gemini 2.0 Flash' });
+      const data = await r.json();
+      const cand = data?.candidates?.[0];
+
+      // Si el modelo se quedó sin tokens, decirlo claro en vez de fallar al parsear.
+      if (cand?.finishReason && cand.finishReason !== 'STOP') {
+        throw new Error(
+          `la generación terminó por "${cand.finishReason}" (respuesta incompleta). ` +
+          `Reduce el número de evidencias o divide el análisis.`
+        );
+      }
+
+      // La respuesta puede venir repartida en varias "parts".
+      const texto = (cand?.content?.parts || [])
+        .map((p) => p?.text || '')
+        .join('');
+
+      const informe = extraerJSON(texto, `Gemini (${GEMINI_MODELO})`);
+      return res.status(200).json({
+        informe,
+        notaLegal: NOTA_LEGAL,
+        motor: `Gemini ${GEMINI_MODELO}`
+      });
     } catch (e) {
+      fallos.push(`Gemini: ${e.message}`);
       console.warn('Gemini falló, se conmuta a Groq:', e.message);
     }
   }
 
-  // ---------- Intento 2: Groq (respaldo, cadena de modelos) ----------
+  // ---------- Intento 2: Groq (respaldo) ----------
   if (GROQ_KEY) {
-    const MODELOS_GROQ = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'groq/compound-mini'];
-    let ultimoError = 'Groq no respondió.';
+    // compound-mini no admite response_format json_object: se marca aparte.
+    const MODELOS_GROQ = [
+      { id: 'openai/gpt-oss-120b', json: true },
+      { id: 'openai/gpt-oss-20b', json: true },
+      { id: 'groq/compound-mini', json: false }
+    ];
 
     for (const modelo of MODELOS_GROQ) {
       try {
+        const cuerpo = {
+          model: modelo.id,
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0,
+          max_completion_tokens: 32768
+        };
+        if (modelo.json) cuerpo.response_format = { type: 'json_object' };
+
         const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_KEY}` },
-          body: JSON.stringify({
-            model: modelo,
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0,
-            response_format: { type: 'json_object' }
-          })
+          body: JSON.stringify(cuerpo)
         });
 
         if (!r.ok) {
-          ultimoError = `${modelo} respondió ${r.status}`;
+          const t = await r.text().catch(() => '');
+          fallos.push(`Groq ${modelo.id}: HTTP ${r.status}. ${t.slice(0, 200)}`);
           continue;
         }
 
         const data = await r.json();
-        const informe = extraerJSON(data?.choices?.[0]?.message?.content);
-        return res.status(200).json({ informe, notaLegal: NOTA_LEGAL, motor: `Groq ${modelo} (respaldo)` });
+        const eleccion = data?.choices?.[0];
+
+        if (eleccion?.finish_reason === 'length') {
+          fallos.push(`Groq ${modelo.id}: respuesta cortada por límite de tokens.`);
+          continue;
+        }
+
+        const informe = extraerJSON(eleccion?.message?.content, `Groq ${modelo.id}`);
+        return res.status(200).json({
+          informe,
+          notaLegal: NOTA_LEGAL,
+          motor: `Groq ${modelo.id} (respaldo)`
+        });
       } catch (e) {
-        ultimoError = e.message;
+        fallos.push(`Groq ${modelo.id}: ${e.message}`);
       }
     }
-
-    return res.status(500).json({ error: `No se pudo generar el ROS. ${ultimoError}` });
   }
 
-  return res.status(500).json({ error: 'Faltan GEMINI_API_KEY y GROQ_API_KEY en las variables de entorno.' });
+  if (!GEMINI_KEY && !GROQ_KEY) {
+    return res.status(500).json({
+      error: 'Faltan GEMINI_API_KEY y GROQ_API_KEY en las variables de entorno.'
+    });
+  }
+
+  return res.status(500).json({
+    error: 'Ningún motor pudo generar el ROS.',
+    detalle: fallos
+  });
 });
 
-// Vercel: el llenado completo de la plantilla puede tardar más de 10 s.
 module.exports.config = { maxDuration: 60 };
