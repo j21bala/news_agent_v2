@@ -107,7 +107,7 @@ module.exports = protegerRuta(async (req, res) => {
   // siempre al último Flash estable, así este código no se rompe cada vez que
   // retiran una versión (p. ej. 2.5-flash: baja el 16/10/2026). Si prefieres
   // fijar una versión concreta, defínela en GEMINI_MODEL en Vercel.
-  const GEMINI_MODELO = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+  const GEMINI_MODELO = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
   const MAX_CHARS = 180000;
   const evidencias = String(textoDocumentos).slice(0, MAX_CHARS);
@@ -174,11 +174,7 @@ module.exports = protegerRuta(async (req, res) => {
   if (GROQ_KEY) {
     // compound-mini no admite response_format json_object y su tope real de
     // salida es 8192 tokens (no 32768): se marca aparte para cada uno.
-    const MODELOS_GROQ = [
-      { id: 'openai/gpt-oss-120b', json: true, maxTokens: 65536 },
-      { id: 'openai/gpt-oss-20b', json: true, maxTokens: 65536 },
-      { id: 'groq/compound-mini', json: false, maxTokens: 8192 }
-    ];
+    const MODELOS_GROQ = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'groq/compound-mini'];
 
     for (const modelo of MODELOS_GROQ) {
       try {
