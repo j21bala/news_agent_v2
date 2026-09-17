@@ -70,6 +70,28 @@ function extraerJSON(texto, etiquetaMotor) {
   }
 }
 
+// Reintenta con backoff exponencial ante errores transitorios (modelo saturado,
+// rate limit, etc.). Evita conmutar a Groq por un 503 que se resuelve solo
+// segundos después. No reintenta errores permanentes (4xx que no sean 429).
+async function fetchConReintentos(url, opciones, intentos = 3) {
+  const CODIGOS_TRANSITORIOS = new Set([429, 500, 502, 503, 504]);
+  let ultimaRespuesta;
+
+  for (let i = 0; i < intentos; i++) {
+    const r = await fetch(url, opciones);
+    if (r.ok) return r;
+
+    ultimaRespuesta = r;
+    if (!CODIGOS_TRANSITORIOS.has(r.status) || i === intentos - 1) return r;
+
+    const espera = 1000 * Math.pow(2, i); // 1s, 2s, 4s
+    console.warn(`Gemini respondió HTTP ${r.status} (intento ${i + 1}/${intentos}), reintentando en ${espera}ms...`);
+    await new Promise((resolve) => setTimeout(resolve, espera));
+  }
+
+  return ultimaRespuesta;
+}
+
 module.exports = protegerRuta(async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
@@ -97,7 +119,7 @@ module.exports = protegerRuta(async (req, res) => {
   // ---------- Intento 1: Gemini ----------
   if (GEMINI_KEY) {
     try {
-      const r = await fetch(
+      const r = await fetchConReintentos(
         `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODELO}:generateContent?key=${GEMINI_KEY}`,
         {
           method: 'POST',
