@@ -107,7 +107,7 @@ module.exports = protegerRuta(async (req, res) => {
   // siempre al último Flash estable, así este código no se rompe cada vez que
   // retiran una versión (p. ej. 2.5-flash: baja el 16/10/2026). Si prefieres
   // fijar una versión concreta, defínela en GEMINI_MODEL en Vercel.
-  const GEMINI_MODELO = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const GEMINI_MODELO = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 
   const MAX_CHARS = 180000;
   const evidencias = String(textoDocumentos).slice(0, MAX_CHARS);
