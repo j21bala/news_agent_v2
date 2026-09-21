@@ -24,20 +24,23 @@ Responde ÚNICA Y ESTRICTAMENTE con un objeto JSON válido (sin markdown, sin co
 }`;
 
 // Cadena de modelos Gemini: el primero que responda gana.
-// Si en Vercel defines GEMINI_MODEL, se prueba primero ese.
 function modelosGemini() {
-  const lista = [process.env.GEMINI_MODEL, 'gemini-flash-latest', 'gemini-3.6-flash']
-    .filter(Boolean);
+  const lista = [
+    process.env.GEMINI_MODEL,
+    'gemini-flash-latest',
+    'gemini-flash-lite-latest',
+    'gemini-3.6-flash'
+  ].filter(Boolean);
   return [...new Set(lista)];
 }
 
-// Fallback gratuito con visión: mismos modelos que ya usas en Groq.
-const MODELOS_GROQ_VISION = [
-  'meta-llama/llama-4-scout-17b-16e-instruct',
-  'meta-llama/llama-4-maverick-17b-128e-instruct'
-];
+// Único modelo con visión disponible actualmente en Groq.
+// Límite: 3 imágenes por petición y 16.384 tokens de salida.
+const GROQ_VISION = 'qwen/qwen3.8-27b';
+const GROQ_VISION_IMAGENES_POR_LLAMADA = 3;
+const GROQ_TEXTO = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
 
-// Reintentos con backoff: la sobrecarga (503) suele durar segundos.
+// Reintentos con backoff ante sobrecarga transitoria (429/5xx).
 async function fetchConReintentos(url, opciones, intentos = 3) {
   const TRANSITORIOS = new Set([429, 500, 502, 503, 504]);
   let ultima;
@@ -46,7 +49,7 @@ async function fetchConReintentos(url, opciones, intentos = 3) {
     if (r.ok) return r;
     ultima = r;
     if (!TRANSITORIOS.has(r.status) || i === intentos - 1) return r;
-    const espera = 1500 * Math.pow(2, i);
+    const espera = 2000 * Math.pow(2, i);
     console.warn(`HTTP ${r.status} (intento ${i + 1}/${intentos}), esperando ${espera}ms...`);
     await new Promise(res => setTimeout(res, espera));
   }
@@ -64,18 +67,26 @@ function extraerJSON(texto) {
   return JSON.parse(limpio.slice(inicio, fin + 1));
 }
 
-function construirPartes(prompt, imagenes) {
-  const parts = [{ text: prompt }];
-  imagenes.forEach((img) => {
+function partesImagenes(imagenes) {
+  return imagenes.map((img) => {
     const data = typeof img === 'string' ? img : img.data;
     const mime = typeof img === 'string' ? 'image/jpeg' : (img.mimeType || 'image/jpeg');
-    parts.push({ inline_data: { mime_type: mime, data } });
+    return { inline_data: { mime_type: mime, data } };
   });
-  return parts;
 }
 
+function partesImagenesGroq(imagenes) {
+  return imagenes.map((img) => {
+    const data = typeof img === 'string' ? img : img.data;
+    const mime = typeof img === 'string' ? 'image/jpeg' : (img.mimeType || 'image/jpeg');
+    return { type: 'image_url', image_url: { url: `data:${mime};base64,${data}` } };
+  });
+}
+
+// ---------- Motor 1: Gemini ----------
 async function intentarGemini(imagenes) {
   const KEY = process.env.GEMINI_API_KEY;
+  if (!KEY) throw new Error('Sin GEMINI_API_KEY.');
   const fallos = [];
   for (const modelo of modelosGemini()) {
     const r = await fetchConReintentos(
@@ -84,7 +95,7 @@ async function intentarGemini(imagenes) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: construirPartes(PROMPT_CLIENTE, imagenes) }],
+          contents: [{ parts: [{ text: PROMPT_CLIENTE }, ...partesImagenes(imagenes)] }],
           generationConfig: { temperature: 0.1, response_mime_type: 'application/json' }
         })
       }
@@ -92,7 +103,7 @@ async function intentarGemini(imagenes) {
     if (r.ok) {
       const d = await r.json();
       const texto = (d?.candidates?.[0]?.content?.parts || []).map(p => p?.text || '').join('');
-      if (texto) return { data: JSON.parse(extraerJSON(texto)), motor: `Gemini ${modelo}` };
+      if (texto) return { data: extraerJSON(texto), motor: `Gemini ${modelo}` };
       fallos.push(`${modelo}: respuesta vacía`);
       continue;
     }
@@ -103,43 +114,110 @@ async function intentarGemini(imagenes) {
   throw new Error(fallos.join(' | '));
 }
 
-async function intentarGroqVision(imagenes) {
+// ---------- Motor 2: Groq visión (en bloques de 3 imágenes) ----------
+async function groqVisionBloque(bloque) {
   const KEY = process.env.GROQ_API_KEY;
-  if (!KEY) throw new Error('Sin GROQ_API_KEY para el respaldo de visión.');
-  const content = [{ type: 'text', text: PROMPT_CLIENTE }];
-  imagenes.forEach((img) => {
-    const data = typeof img === 'string' ? img : img.data;
-    const mime = typeof img === 'string' ? 'image/jpeg' : (img.mimeType || 'image/jpeg');
-    content.push({ type: 'image_url', image_url: { url: `data:${mime};base64,${data}` } });
+  const r = await fetchConReintentos('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${KEY}` },
+    body: JSON.stringify({
+      model: GROQ_VISION,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: PROMPT_CLIENTE + '\nAnaliza SOLO las imágenes adjuntas en este bloque.' },
+          ...partesImagenesGroq(bloque)
+        ]
+      }],
+      temperature: 0,
+      max_completion_tokens: 8192,
+      response_format: { type: 'json_object' }
+    })
   });
+  if (!r.ok) {
+    const t = await r.text().catch(() => '');
+    throw new Error(`${GROQ_VISION}: HTTP ${r.status}. ${t.slice(0, 200)}`);
+  }
+  const d = await r.json();
+  return extraerJSON(d?.choices?.[0]?.message?.content);
+}
+
+// Consolida los JSON parciales de cada bloque en un único perfil.
+async function consolidarConGroqTexto(partials) {
+  const KEY = process.env.GROQ_API_KEY;
+  const prompt = `Recibirás ${partials.length} análisis JSON parciales de un MISMO cliente bancario, cada uno derivado de un subconjunto de capturas de pantalla. Consolídalos en un ÚNICO objeto JSON con exactamente la misma estructura. Reglas: para cada campo elige el valor no nulo más completo; nunca inventes datos; concatena y deduplica productos, movimientos (ordenados por fecha) y alertas; promedia score_riesgo si difieren; el analisis_narrativo debe integrar todos los hallazgos en 2 a 4 párrafos. Responde ÚNICAMENTE con el objeto JSON final.
+JSON parciales:
+${JSON.stringify(partials)}`;
   const fallos = [];
-  for (const modelo of MODELOS_GROQ_VISION) {
+  for (const modelo of GROQ_TEXTO) {
     try {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${KEY}` },
         body: JSON.stringify({
           model: modelo,
-          messages: [{ role: 'user', content }],
+          messages: [{ role: 'user', content: prompt }],
           temperature: 0,
-          max_tokens: 4096,
+          max_completion_tokens: 8192,
           response_format: { type: 'json_object' }
         })
       });
-      if (!r.ok) {
-        const t = await r.text().catch(() => '');
-        fallos.push(`${modelo}: HTTP ${r.status}. ${t.slice(0, 150)}`);
-        continue;
-      }
+      if (!r.ok) { fallos.push(`${modelo}: HTTP ${r.status}`); continue; }
       const d = await r.json();
-      const texto = d?.choices?.[0]?.message?.content;
-      if (texto) return { data: extraerJSON(texto), motor: `Groq ${modelo}` };
-      fallos.push(`${modelo}: respuesta vacía`);
-    } catch (e) {
-      fallos.push(`${modelo}: ${e.message}`);
+      return { data: extraerJSON(d?.choices?.[0]?.message?.content), motor: `Groq ${GROQ_VISION} + ${modelo}` };
+    } catch (e) { fallos.push(`${modelo}: ${e.message}`); }
+  }
+  console.warn('Consolidación con modelo de texto falló, se aplica fusión básica:', fallos.join(' | '));
+  return { data: mergeBasico(partials), motor: `Groq ${GROQ_VISION} (fusión básica)` };
+}
+
+// Fusión programática de respaldo si el modelo de texto no está disponible.
+function mergeBasico(partials) {
+  const out = JSON.parse(JSON.stringify(partials[0] || {}));
+  for (const p of partials.slice(1)) {
+    if (!p || typeof p !== 'object') continue;
+    if (p.cliente) {
+      out.cliente = out.cliente || {};
+      for (const [k, v] of Object.entries(p.cliente)) {
+        if ((out.cliente[k] === null || out.cliente[k] === undefined || out.cliente[k] === '') && v != null) {
+          out.cliente[k] = v;
+        }
+      }
+    }
+    for (const k of ['score_riesgo', 'ingresos_calculados', 'egresos_calculados', 'valor_activos', 'valor_pasivos']) {
+      if ((out[k] === null || out[k] === undefined) && p[k] != null) out[k] = p[k];
+    }
+    out.productos = [...(out.productos || []), ...(p.productos || [])];
+    out.movimientos = [...(out.movimientos || []), ...(p.movimientos || [])];
+    out.alertas = [...new Set([...(out.alertas || []), ...(p.alertas || [])])];
+    if (p.analisis_narrativo) {
+      out.analisis_narrativo = out.analisis_narrativo
+        ? out.analisis_narrativo + '\n\n' + p.analisis_narrativo
+        : p.analisis_narrativo;
     }
   }
-  throw new Error(fallos.join(' | '));
+  return out;
+}
+
+async function intentarGroqVision(imagenes) {
+  const KEY = process.env.GROQ_API_KEY;
+  if (!KEY) throw new Error('Sin GROQ_API_KEY para el respaldo de visión.');
+  const bloques = [];
+  for (let i = 0; i < imagenes.length; i += GROQ_VISION_IMAGENES_POR_LLAMADA) {
+    bloques.push(imagenes.slice(i, i + GROQ_VISION_IMAGENES_POR_LLAMADA));
+  }
+  const results = await Promise.all(bloques.map(b => groqVisionBloque(b).catch(e => {
+    console.error('Bloque Groq visión falló:', e.message);
+    return null;
+  })));
+  const partials = results.filter(Boolean);
+  if (partials.length === 0) {
+    throw new Error(`Ningún bloque pudo procesarse con ${GROQ_VISION}.`);
+  }
+  if (partials.length === 1) {
+    return { data: partials[0], motor: `Groq ${GROQ_VISION}` };
+  }
+  return consolidarConGroqTexto(partials);
 }
 
 module.exports = protegerRuta(async (req, res) => {
@@ -172,4 +250,5 @@ module.exports = protegerRuta(async (req, res) => {
   }
 });
 
+// Límite de ejecución en Vercel suficiente para 6 imágenes.
 module.exports.config = { maxDuration: 60 };
