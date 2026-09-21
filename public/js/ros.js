@@ -117,34 +117,79 @@
   }
 
   // --------------------------------------------- extracción de texto por tipo
+  // Contrato único: cada lector devuelve { texto, imagenes }.
+  // - texto: lo que se pudo extraer como texto plano (puede ser '').
+  // - imagenes: [{ data(base64), mimeType, origen }] — páginas o archivos que
+  //   NO tienen texto aprovechable y por eso se le "muestran" a la IA (visión),
+  //   para que ninguna evidencia se pierda solo porque no tenía texto.
+  const UMBRAL_TEXTO_PAGINA = 40; // menos caracteres útiles => se asume escaneada/imagen
+
+  async function renderizarPaginaComoImagen(page) {
+    const MAX_PX = 1600; // limita el peso de cada imagen sin perder legibilidad
+    const base = page.getViewport({ scale: 1 });
+    const escala = Math.min(2.5, Math.max(1, MAX_PX / Math.max(base.width, base.height)));
+    const viewport = page.getViewport({ scale: escala });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    return canvas.toDataURL('image/jpeg', 0.72).split(',')[1];
+  }
+
   async function leerPDF(file) {
     if (!window.pdfjsLib) throw new Error('No se cargó pdf.js para leer PDF.');
     const buf = await file.arrayBuffer();
-    const pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
-    let out = '';
+
+    let pdf;
+    try {
+      pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+    } catch (e) {
+      // PDF corrupto o protegido con contraseña: no hay forma de leerlo sin
+      // esa contraseña. Se deja constancia clara en vez de romper el lote.
+      return { texto: `[PDF no se pudo abrir (¿protegido o dañado?): ${e.message}]`, imagenes: [] };
+    }
+
+    let texto = '';
+    const imagenes = [];
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const tc = await page.getTextContent();
-      out += `\n--- Página ${i} ---\n` + tc.items.map((it) => it.str).join(' ');
+      const textoPagina = tc.items.map((it) => it.str).join(' ').trim();
+
+      if (textoPagina.length >= UMBRAL_TEXTO_PAGINA) {
+        texto += `\n[p.${i}] ${textoPagina}`;
+      } else {
+        // Página sin texto útil (escaneo, plano, firma, sello, etc.): se
+        // convierte a imagen para que el modelo con visión la lea igual.
+        try {
+          const data = await renderizarPaginaComoImagen(page);
+          imagenes.push({ data, mimeType: 'image/jpeg', origen: `${file.name} — página ${i}` });
+        } catch (e) {
+          texto += `\n[p.${i}] [No se pudo renderizar esta página como imagen: ${e.message}]`;
+        }
+      }
     }
-    return out;
+    return { texto, imagenes };
   }
 
   async function leerDocx(file) {
     if (!window.mammoth) throw new Error('No se cargó mammoth.js para leer Word.');
     const buf = await file.arrayBuffer();
     const r = await window.mammoth.extractRawText({ arrayBuffer: buf });
-    return r.value || '';
+    return { texto: r.value || '', imagenes: [] };
   }
 
   async function leerExcel(file) {
     if (!window.XLSX) throw new Error('No se cargó SheetJS para leer Excel.');
     const buf = await file.arrayBuffer();
     const wb = window.XLSX.read(buf, { type: 'array' });
-    return wb.SheetNames.map((n) => {
+    const texto = wb.SheetNames.map((n) => {
       const csv = compactarCSV(window.XLSX.utils.sheet_to_csv(wb.Sheets[n]));
       return csv ? `\n--- Hoja: ${n} ---\n${csv}` : '';
     }).filter(Boolean).join('\n');
+    return { texto, imagenes: [] };
   }
 
   // Correos exportados como .eml (MIME estándar): extrae encabezados clave y
@@ -174,7 +219,8 @@
     // Decodifica quoted-printable básico.
     cuerpo = cuerpo.replace(/=\r?\n/g, '').replace(/=([0-9A-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
 
-    return `De: ${getHeader('From')}\nPara: ${getHeader('To')}\nFecha: ${getHeader('Date')}\nAsunto: ${getHeader('Subject')}\n\n${cuerpo}`;
+    const texto = `De: ${getHeader('From')}\nPara: ${getHeader('To')}\nFecha: ${getHeader('Date')}\nAsunto: ${getHeader('Subject')}\n\n${cuerpo}`;
+    return { texto, imagenes: [] };
   }
 
   // Correos .msg (formato binario propietario de Outlook, OLE compound file):
@@ -194,18 +240,44 @@
       }
     }
     if (actual.trim().length >= 5) cadenas.add(actual.trim());
-    return `[Correo .msg — texto extraído automáticamente]\n${Array.from(cadenas).join('\n')}`;
+    return { texto: `[Correo .msg — texto extraído automáticamente]\n${Array.from(cadenas).join('\n')}`, imagenes: [] };
   }
 
-  async function extraerTexto(file) {
+  async function leerImagen(file) {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('No se pudo leer la imagen.'));
+      reader.readAsDataURL(file);
+    });
+    const mimeType = file.type || 'image/jpeg';
+    return { texto: '', imagenes: [{ data: dataUrl.split(',')[1], mimeType, origen: file.name }] };
+  }
+
+  async function leerTextoPlano(file) {
+    return { texto: await file.text(), imagenes: [] };
+  }
+
+  // Punto único de entrada: nunca lanza — si algo falla, devuelve constancia
+  // del fallo como texto en vez de detener el resto del lote. Así el analista
+  // nunca tiene que reintentar ni reprocesar nada a mano.
+  async function extraerEvidencia(file) {
     const nombre = file.name.toLowerCase();
-    if (nombre.endsWith('.pdf')) return leerPDF(file);
-    if (nombre.endsWith('.docx')) return leerDocx(file);
-    if (/\.(xlsx|xlsm|xls|csv)$/.test(nombre)) return leerExcel(file);
-    if (nombre.endsWith('.eml')) return leerEML(file);
-    if (nombre.endsWith('.msg')) return leerMSG(file);
-    if (/\.(txt|md|json)$/.test(nombre)) return file.text();
-    throw new Error(`Formato no soportado: ${file.name}`);
+    try {
+      if (nombre.endsWith('.pdf')) return await leerPDF(file);
+      if (nombre.endsWith('.docx')) return await leerDocx(file);
+      if (/\.(xlsx|xlsm|xls|csv)$/.test(nombre)) return await leerExcel(file);
+      if (nombre.endsWith('.eml')) return await leerEML(file);
+      if (nombre.endsWith('.msg')) return await leerMSG(file);
+      if (/\.(jpg|jpeg|png|webp)$/.test(nombre)) return await leerImagen(file);
+      if (/\.(txt|md|json)$/.test(nombre)) return await leerTextoPlano(file);
+      // Formato desconocido: se intenta como imagen por si el navegador lo
+      // puede mostrar (p. ej. .gif, .bmp); si tampoco, queda constancia.
+      if (file.type && file.type.startsWith('image/')) return await leerImagen(file);
+      return { texto: `[Formato no soportado: ${file.name}]`, imagenes: [] };
+    } catch (e) {
+      return { texto: `[No se pudo leer ${file.name}: ${e.message}]`, imagenes: [] };
+    }
   }
 
   // ------------------------------------------------------ llamada al generador
@@ -223,34 +295,38 @@
     btn.classList.add('opacity-50');
 
     try {
-      // 1) Extraer texto de cada evidencia y comprimirlo a un formato liviano
-      //    (menos tokens por archivo) para que quepan muchas evidencias juntas.
+      // 1) Extraer texto/imágenes de cada evidencia y comprimir el texto a un
+      //    formato liviano (menos tokens) para que quepan muchas evidencias
+      //    juntas. Lo que no tenga texto aprovechable (PDF escaneado, fotos)
+      //    se manda como imagen para que la IA lo "vea" en vez de perderlo.
       const total = rosArchivosAcumulados.length;
-      const partes = [];
+      const partesTexto = [];
+      const imagenesEvidencia = [];
       for (let i = 0; i < total; i++) {
         const f = rosArchivosAcumulados[i];
         status(`<i class="fa-solid fa-spinner fa-spin text-teal"></i> Leyendo evidencia ${i + 1} de ${total}: ${esc(f.name)}`);
-        try {
-          const crudo = await extraerTexto(f);
-          const texto = compactarTexto(crudo);
-          partes.push(`\n\n===== EVIDENCIA: ${f.name} =====\n${texto}`);
-        } catch (e) {
-          partes.push(`\n\n===== EVIDENCIA: ${f.name} =====\n[No se pudo extraer texto: ${e.message}]`);
+        const { texto, imagenes } = await extraerEvidencia(f);
+        if (texto && texto.trim()) {
+          partesTexto.push(`\n\n===== EVIDENCIA: ${f.name} =====\n${compactarTexto(texto)}`);
         }
+        (imagenes || []).forEach((img) => imagenesEvidencia.push(img));
       }
-      rosArchivosTexto = partes.join('\n');
+      rosArchivosTexto = partesTexto.join('\n');
 
-      if (rosArchivosTexto.replace(/\s/g, '').length < 50) {
-        throw new Error('No se pudo extraer texto legible de las evidencias cargadas.');
+      if (rosArchivosTexto.replace(/\s/g, '').length < 50 && imagenesEvidencia.length === 0) {
+        throw new Error('No se pudo extraer texto ni imágenes legibles de las evidencias cargadas.');
       }
 
       // 2) Generar el ROS sobre la plantilla fija
-      status('<i class="fa-solid fa-spinner fa-spin text-teal"></i> Diligenciando la plantilla oficial de ROS (temperatura 0)...');
+      const totalImg = imagenesEvidencia.length;
+      status(totalImg
+        ? `<i class="fa-solid fa-spinner fa-spin text-teal"></i> Diligenciando la plantilla oficial de ROS (incluye ${totalImg} página(s) leídas por visión)...`
+        : '<i class="fa-solid fa-spinner fa-spin text-teal"></i> Diligenciando la plantilla oficial de ROS (temperatura 0)...');
 
       const res = await SarlaftAuth.authFetch('/api/generar-ros', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ textoDocumentos: rosArchivosTexto, instruccionesAnalista })
+        body: JSON.stringify({ textoDocumentos: rosArchivosTexto, instruccionesAnalista, imagenes: imagenesEvidencia })
       });
 
       const data = await res.json();

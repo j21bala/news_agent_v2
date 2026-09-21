@@ -191,7 +191,7 @@
                 <button onclick="window.exportarPDF()" class="text-red-600 font-bold hover:bg-red-50 text-sm px-3 py-2 bg-white rounded border border-slate-300 shadow-sm transition-colors"><i class="fa-solid fa-file-pdf"></i> Imprimir PDF</button>
             </div>
         </div>
-
+        
         <div class="max-w-5xl mx-auto p-8 mt-4">
             <!-- El reporte idéntico a la versión 1 (generado por app.js) se inyecta aquí -->
             <div id="reportes-container" class="panel-cristal border border-slate-200/70 rounded-2xl p-8"></div>
@@ -250,9 +250,9 @@
                 </div>
 
                 <div class="mb-8">
-                    <label class="block font-semibold text-sm mb-2 text-navy">3. Cargar Evidencias (PDF, Word, Excel, Correos .eml/.msg, CSV, TXT)</label>
+                    <label class="block font-semibold text-sm mb-2 text-navy">3. Cargar Evidencias (PDF incl. escaneados, Word, Excel, Imágenes, Correos .eml/.msg, CSV, TXT)</label>
                     <div class="relative border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:bg-slate-50 hover:border-gold transition-colors">
-                        <input type="file" id="rosArchivos" multiple accept=".pdf,.docx,.xlsx,.xlsm,.xls,.csv,.txt,.md,.json,.eml,.msg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="window.agregarArchivosRos(this.files)">
+                        <input type="file" id="rosArchivos" multiple accept=".pdf,.docx,.xlsx,.xlsm,.xls,.csv,.txt,.md,.json,.eml,.msg,.jpg,.jpeg,.png,.webp" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="window.agregarArchivosRos(this.files)">
                         <i class="fa-solid fa-folder-open text-3xl text-slate-400 mb-3"></i>
                         <p class="text-sm text-slate-500 font-semibold">Haz clic o arrastra archivos aquí (se van acumulando)</p>
                     </div>
