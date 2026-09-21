@@ -13,6 +13,7 @@
 
   let rosArchivosTexto = '';   // texto extraído de las evidencias
   let rosInformeActual = null; // último JSON devuelto por la IA
+  let rosArchivosAcumulados = []; // File[] — se van sumando entre selecciones/drops
 
   const VACIO = '';
   const NOTA_LEGAL_FALLBACK =
@@ -41,21 +42,79 @@
   }
 
   // ------------------------------------------------- listado de archivos cargados
-  window.mostrarArchivos = function (idInput, idLista) {
-    const input = document.getElementById(idInput);
-    const lista = document.getElementById(idLista);
-    if (!input || !lista) return;
+  // Los archivos se ACUMULAN: cada nueva selección o drop se suma a los ya
+  // cargados (no los reemplaza). Se deduplica por nombre+tamaño+fecha.
+  window.agregarArchivosRos = function (fileList) {
+    Array.from(fileList || []).forEach((f) => {
+      const yaExiste = rosArchivosAcumulados.some(
+        (x) => x.name === f.name && x.size === f.size && x.lastModified === f.lastModified
+      );
+      if (!yaExiste) rosArchivosAcumulados.push(f);
+    });
+    renderizarListaArchivosRos();
+
+    // Limpia el <input> para que el próximo drop/selección se sume y no reemplace.
+    const input = document.getElementById('rosArchivos');
+    if (input) input.value = '';
+  };
+
+  window.quitarArchivoRos = function (idx) {
+    rosArchivosAcumulados.splice(idx, 1);
+    renderizarListaArchivosRos();
+  };
+
+  window.limpiarArchivosRos = function () {
+    rosArchivosAcumulados = [];
+    renderizarListaArchivosRos();
+  };
+
+  function renderizarListaArchivosRos() {
+    const lista = document.getElementById('rosListaArchivos');
+    if (!lista) return;
 
     lista.innerHTML = '';
-    Array.from(input.files).forEach((f) => {
+    rosArchivosAcumulados.forEach((f, idx) => {
       const li = document.createElement('li');
-      li.className = 'flex items-center gap-2';
+      li.className = 'flex items-center justify-between gap-2';
       li.innerHTML =
-        `<i class="fa-solid fa-file-lines text-gold"></i> ${esc(f.name)} ` +
-        `<span class="text-slate-400 text-xs">(${(f.size / 1024).toFixed(0)} KB)</span>`;
+        `<span class="flex items-center gap-2"><i class="fa-solid fa-file-lines text-gold"></i> ${esc(f.name)} ` +
+        `<span class="text-slate-400 text-xs">(${(f.size / 1024).toFixed(0)} KB)</span></span>` +
+        `<button type="button" onclick="window.quitarArchivoRos(${idx})" class="text-slate-400 hover:text-red-500" title="Quitar"><i class="fa-solid fa-xmark"></i></button>`;
       lista.appendChild(li);
     });
-  };
+
+    const contador = document.getElementById('rosContadorArchivos');
+    if (contador) {
+      contador.innerHTML = rosArchivosAcumulados.length
+        ? `${rosArchivosAcumulados.length} archivo(s) cargado(s) · <button type="button" onclick="window.limpiarArchivosRos()" class="underline hover:text-red-500">vaciar</button>`
+        : '';
+    }
+  }
+
+  // Compatibilidad con el nombre anterior (por si algo más lo referencia).
+  window.mostrarArchivos = function () { renderizarListaArchivosRos(); };
+
+  // --------------------------------------- reduce a texto plano y liviano
+  // Colapsa espacios/saltos de línea redundantes que vienen de la extracción
+  // (PDF/Word/Excel) para minimizar los tokens que consume la IA, sin perder
+  // información. Así entran muchos más archivos dentro del mismo presupuesto.
+  function compactarTexto(texto) {
+    return String(texto || '')
+      .replace(/\r\n?/g, '\n')
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n[ \t]+/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function compactarCSV(csv) {
+    return String(csv || '')
+      .split('\n')
+      .map((l) => l.replace(/,+$/g, '').trim())
+      .filter((l) => l.replace(/,/g, '').trim() !== '')
+      .join('\n');
+  }
 
   // --------------------------------------------- extracción de texto por tipo
   async function leerPDF(file) {
@@ -82,9 +141,60 @@
     if (!window.XLSX) throw new Error('No se cargó SheetJS para leer Excel.');
     const buf = await file.arrayBuffer();
     const wb = window.XLSX.read(buf, { type: 'array' });
-    return wb.SheetNames.map(
-      (n) => `\n--- Hoja: ${n} ---\n` + window.XLSX.utils.sheet_to_csv(wb.Sheets[n])
-    ).join('\n');
+    return wb.SheetNames.map((n) => {
+      const csv = compactarCSV(window.XLSX.utils.sheet_to_csv(wb.Sheets[n]));
+      return csv ? `\n--- Hoja: ${n} ---\n${csv}` : '';
+    }).filter(Boolean).join('\n');
+  }
+
+  // Correos exportados como .eml (MIME estándar): extrae encabezados clave y
+  // el cuerpo en texto plano (o el HTML sin etiquetas si no hay texto plano).
+  async function leerEML(file) {
+    const raw = await file.text();
+    const [headerText, ...restoPartes] = raw.split(/\r?\n\r?\n/);
+    let cuerpo = restoPartes.join('\n\n');
+
+    const getHeader = (nombre) => {
+      const m = headerText.match(new RegExp(`^${nombre}:\\s*(.+(?:\\n[ \\t].+)*)`, 'im'));
+      return m ? m[1].replace(/\n[ \t]+/g, ' ').trim() : '';
+    };
+
+    const boundaryMatch = headerText.match(/boundary="?([^"\n;]+)"?/i);
+    if (boundaryMatch) {
+      const boundary = boundaryMatch[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const partes = cuerpo.split(new RegExp(`--${boundary}`, 'g'));
+      const plana = partes.find((p) => /content-type:\s*text\/plain/i.test(p));
+      const html = partes.find((p) => /content-type:\s*text\/html/i.test(p));
+      cuerpo = (plana || html || '').replace(/^[\s\S]*?\r?\n\r?\n/, '');
+      if (!plana && html) cuerpo = cuerpo.replace(/<[^>]+>/g, ' ');
+    } else if (/content-type:\s*text\/html/i.test(headerText)) {
+      cuerpo = cuerpo.replace(/<[^>]+>/g, ' ');
+    }
+
+    // Decodifica quoted-printable básico.
+    cuerpo = cuerpo.replace(/=\r?\n/g, '').replace(/=([0-9A-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+
+    return `De: ${getHeader('From')}\nPara: ${getHeader('To')}\nFecha: ${getHeader('Date')}\nAsunto: ${getHeader('Subject')}\n\n${cuerpo}`;
+  }
+
+  // Correos .msg (formato binario propietario de Outlook, OLE compound file):
+  // sin librería, se hace una extracción de mejor esfuerzo de las cadenas de
+  // texto legibles (UTF-16LE, como guarda Outlook el asunto/cuerpo/remitente).
+  async function leerMSG(file) {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    const cadenas = new Set();
+    let actual = '';
+    for (let i = 0; i < buf.length - 1; i += 2) {
+      const code = buf[i] | (buf[i + 1] << 8);
+      if (code >= 32 && code < 127) {
+        actual += String.fromCharCode(code);
+      } else {
+        if (actual.trim().length >= 5) cadenas.add(actual.trim());
+        actual = '';
+      }
+    }
+    if (actual.trim().length >= 5) cadenas.add(actual.trim());
+    return `[Correo .msg — texto extraído automáticamente]\n${Array.from(cadenas).join('\n')}`;
   }
 
   async function extraerTexto(file) {
@@ -92,18 +202,19 @@
     if (nombre.endsWith('.pdf')) return leerPDF(file);
     if (nombre.endsWith('.docx')) return leerDocx(file);
     if (/\.(xlsx|xlsm|xls|csv)$/.test(nombre)) return leerExcel(file);
+    if (nombre.endsWith('.eml')) return leerEML(file);
+    if (nombre.endsWith('.msg')) return leerMSG(file);
     if (/\.(txt|md|json)$/.test(nombre)) return file.text();
     throw new Error(`Formato no soportado: ${file.name}`);
   }
 
   // ------------------------------------------------------ llamada al generador
   window.analizarROS = async function () {
-    const input = document.getElementById('rosArchivos');
     const btn = document.getElementById('btnAnalizarRos');
     const instruccionesAnalista =
       (document.getElementById('rosInstrucciones')?.value || '').trim();
 
-    if (!input || input.files.length === 0) {
+    if (rosArchivosAcumulados.length === 0) {
       alert('Carga al menos un documento de evidencia.');
       return;
     }
@@ -112,13 +223,16 @@
     btn.classList.add('opacity-50');
 
     try {
-      // 1) Extraer texto de cada evidencia
+      // 1) Extraer texto de cada evidencia y comprimirlo a un formato liviano
+      //    (menos tokens por archivo) para que quepan muchas evidencias juntas.
+      const total = rosArchivosAcumulados.length;
       const partes = [];
-      for (let i = 0; i < input.files.length; i++) {
-        const f = input.files[i];
-        status(`<i class="fa-solid fa-spinner fa-spin text-teal"></i> Leyendo evidencia ${i + 1} de ${input.files.length}: ${esc(f.name)}`);
+      for (let i = 0; i < total; i++) {
+        const f = rosArchivosAcumulados[i];
+        status(`<i class="fa-solid fa-spinner fa-spin text-teal"></i> Leyendo evidencia ${i + 1} de ${total}: ${esc(f.name)}`);
         try {
-          const texto = await extraerTexto(f);
+          const crudo = await extraerTexto(f);
+          const texto = compactarTexto(crudo);
           partes.push(`\n\n===== EVIDENCIA: ${f.name} =====\n${texto}`);
         } catch (e) {
           partes.push(`\n\n===== EVIDENCIA: ${f.name} =====\n[No se pudo extraer texto: ${e.message}]`);
