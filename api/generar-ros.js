@@ -174,7 +174,12 @@ module.exports = protegerRuta(async (req, res) => {
   if (GROQ_KEY) {
     // compound-mini no admite response_format json_object y su tope real de
     // salida es 8192 tokens (no 32768): se marca aparte para cada uno.
-    const MODELOS_GROQ = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'groq/compound-mini'];
+    const MODELOS_GROQ = [
+      { id: 'openai/gpt-oss-120b', maxTokens: 32768, json: true },
+      { id: 'openai/gpt-oss-20b', maxTokens: 16384, json: true },
+      { id: 'groq/compound-mini', maxTokens: 8192, json: false }
+    ];
+    
 
     for (const modelo of MODELOS_GROQ) {
       try {
