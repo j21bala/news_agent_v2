@@ -92,7 +92,7 @@ Responde ÚNICA Y ESTRICTAMENTE con un objeto JSON válido (sin markdown, sin co
         },
       },
 
-      { headers: { "Content-Type": "application/json" }, timeout: 30000 },
+      { headers: { "Content-Type": "application/json" }, timeout: 55000 },
     );
 
     const rawText = response.data.candidates[0].content.parts[0].text;
@@ -109,3 +109,9 @@ Responde ÚNICA Y ESTRICTAMENTE con un objeto JSON válido (sin markdown, sin co
       .json({ error: `Error procesando los documentos del cliente: ${detalle}` });
   }
 });
+
+// Sube el límite de ejecución de la función en Vercel (por defecto 10s Hobby /
+// 15s Pro), insuficiente para analizar hasta 6 imágenes con Gemini.
+module.exports.config = {
+  maxDuration: 60,
+};
