@@ -94,15 +94,12 @@ module.exports = protegerRuta(async (req, res) => {
   const fallos = [];
 
   // ---------- Intento 1: Gemini (único motor con visión) ----------
-  // Se prueban varias versiones del modelo: cuando Google reporta "alta
-  // demanda" (503) suele ser por versión/región puntual, no por toda la
-  // familia Gemini, así que rotar de versión suele resolverlo más rápido
-  // que insistir en la misma con reintentos largos.
+  // Solo se listan versiones vigentes en Google AI (evita el 404 de modelos
+  // retirados como 2.5-flash / 2.0-flash, que ya no aceptan cuentas nuevas).
   const MODELOS_GEMINI = Array.from(new Set([
     process.env.GEMINI_MODEL || 'gemini-3.6-flash',
-    'gemini-2.5-flash',
-    'gemini-2.5-flash-lite',
-    'gemini-2.0-flash'
+    'gemini-3.5-flash',
+    'gemini-3.5-flash-lite'
   ]));
 
   if (GEMINI_KEY) {
@@ -153,6 +150,9 @@ module.exports = protegerRuta(async (req, res) => {
   }
 
   // ---------- Intento 2: Groq (respaldo, SOLO texto — no admite imágenes) ----------
+  console.log(GROQ_KEY
+    ? 'Gemini agotado, intentando motor de respaldo Groq...'
+    : 'Gemini agotado. GROQ_API_KEY no está configurada en Vercel: no hay respaldo disponible.');
   // Catálogo actual de Groq (los IDs verificados hoy):
   // gpt-oss-120b / gpt-oss-20b -> max completion 65536, admiten json_object.
   // qwen/qwen3.8-27b -> max completion 16384, admite json_object.
@@ -171,6 +171,7 @@ module.exports = protegerRuta(async (req, res) => {
     ];
     for (const modelo of MODELOS_GROQ) {
       try {
+        console.log(`Probando Groq ${modelo.id}...`);
         const cuerpo = {
           model: modelo.id,
           messages: [{ role: 'user', content: promptGroq }],
