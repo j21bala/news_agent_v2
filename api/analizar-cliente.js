@@ -69,7 +69,8 @@ Responde ÚNICA Y ESTRICTAMENTE con un objeto JSON válido (sin markdown, sin co
     // Soporta el formato nuevo { data, mimeType } y, por compatibilidad,
     // strings sueltos en base64 (se asume jpeg en ese caso).
     const data = typeof img === "string" ? img : img.data;
-    const mimeType = typeof img === "string" ? "image/jpeg" : (img.mimeType || "image/jpeg");
+    const mimeType =
+      typeof img === "string" ? "image/jpeg" : img.mimeType || "image/jpeg";
     parts.push({
       inline_data: {
         mime_type: mimeType,
@@ -106,7 +107,9 @@ Responde ÚNICA Y ESTRICTAMENTE con un objeto JSON válido (sin markdown, sin co
 
     return res
       .status(500)
-      .json({ error: `Error procesando los documentos del cliente: ${detalle}` });
+      .json({
+        error: `Error procesando los documentos del cliente: ${detalle}`,
+      });
   }
 });
 
