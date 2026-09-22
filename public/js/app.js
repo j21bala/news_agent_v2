@@ -20,6 +20,23 @@ document.addEventListener("DOMContentLoaded", () => {
     if (container && container.children.length === 0) {
         window.agregarNoticia();
     }
+
+    // ---- Chat del asistente: Enter envía, Shift+Enter agrega línea nueva,
+    // y el textarea crece solo con el texto sin perder lo que se escribe ----
+    const chatInput = document.getElementById('chat-input');
+    if (chatInput) {
+        const autoResize = () => {
+            chatInput.style.height = 'auto';
+            chatInput.style.height = Math.min(chatInput.scrollHeight, 112) + 'px';
+        };
+        chatInput.addEventListener('input', autoResize);
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                window.enviarPregunta();
+            }
+        });
+    }
 });
 
 window.agregarNoticia = function() {
@@ -50,7 +67,7 @@ window.eliminarNoticia = function(id) {
 window.analizarTodas = async function() {
     const btn = document.getElementById('btnAnalizar');
     const status = document.getElementById('status');
-    
+
     // Selector blindado que busca las cajas de noticias
     const items = document.querySelectorAll('.noticia-item');
     if (items.length === 0) {
@@ -65,7 +82,7 @@ window.analizarTodas = async function() {
         const id = item.id.replace('noticia-', '');
         const linkEl = document.getElementById(`link-${id}`);
         const textoEl = document.getElementById(`articulo-${id}`);
-        
+
         const link = linkEl ? linkEl.value.trim() : '';
         const texto = textoEl ? textoEl.value.trim() : '';
 
@@ -108,9 +125,9 @@ window.analizarTodas = async function() {
 
     if (status) status.textContent = '';
     if (btn) { btn.disabled = false; btn.classList.remove('opacity-50'); }
-    
+
     contextoReporteActual = reportes[0];
-    
+
     renderTodosReportes();
     window.navegarA('view-reporte');
     document.getElementById('asistente-flotante').classList.remove('hidden');
@@ -158,7 +175,7 @@ function buildReporteHTML(data, ri) {
         lug: '<i class="fa-solid fa-location-dot text-teal mr-1"></i>',
         med: '<i class="fa-solid fa-newspaper text-teal mr-1"></i>'
     };
-    
+
     return `
     <div class="cover bg-navy text-white rounded-xl p-8 mb-6 shadow-md" style="-webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: #0f1b2d !important; color: white !important;">
         <h2 class="text-2xl font-extrabold mb-3">${data.titulo || '—'}</h2>
@@ -224,7 +241,7 @@ function buildPersonaHTML(p, ri, pi) {
     let badgeStyle = 'background-color: #b9770e !important; color: white !important;';
     if (nivelRaw === 'alto') badgeStyle = 'background-color: #b3261e !important; color: white !important;';
     if (nivelRaw === 'bajo') badgeStyle = 'background-color: #2e7d32 !important; color: white !important;';
-    
+
     return `
     <div class="persona-card bg-white border border-slate-200 rounded-xl p-6 mb-5 shadow-sm break-inside-avoid" id="persona-${ri}-${pi}" data-estado="${p.estado_proceso || 'Investigado'}">
         <div class="flex justify-between items-start mb-4">
@@ -240,7 +257,7 @@ function buildPersonaHTML(p, ri, pi) {
                 <button class="no-print text-red-500 hover:text-red-700 bg-red-50 p-2 rounded" onclick="window.eliminarPersona(${ri}, ${pi})"><i class="fa-solid fa-trash"></i></button>
             </div>
         </div>
-        
+
         <div class="text-sm text-navy mb-5 space-y-2 leading-relaxed">
             <div><strong class="text-slate-800">Hechos / Delitos:</strong> ${resaltar(p.rol_en_hechos)}</div>
             <div><strong class="text-slate-800">Análisis de riesgo:</strong> ${resaltar(p.analisis_riesgo)}</div>
@@ -345,6 +362,12 @@ window.eliminarPersona = function(ri, pi) {
     document.getElementById(`persona-${ri}-${pi}`)?.remove();
 };
 
+function escaparHTML(texto) {
+    const div = document.createElement('div');
+    div.textContent = texto;
+    return div.innerHTML;
+}
+
 window.enviarPregunta = async function() {
     const input = document.getElementById('chat-input');
     const pregunta = input.value.trim();
@@ -352,9 +375,10 @@ window.enviarPregunta = async function() {
     if (!contextoReporteActual) return alert("Primero debes generar un reporte.");
 
     const historial = document.getElementById('chat-historial');
-    historial.innerHTML += `<div class="self-end bg-navy text-white px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm">${pregunta}</div>`;
+    historial.innerHTML += `<div class="self-end bg-navy text-white px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm break-words whitespace-pre-wrap">${escaparHTML(pregunta)}</div>`;
     input.value = '';
-    
+    input.style.height = 'auto';
+
     const idTemp = 'temp-' + Date.now();
     historial.innerHTML += `<div id="${idTemp}" class="self-start bg-slate-200 text-slate-500 px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm"><i class="fa-solid fa-ellipsis fa-fade"></i></div>`;
     historial.scrollTop = historial.scrollHeight;
@@ -365,13 +389,21 @@ window.enviarPregunta = async function() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pregunta, contexto: contextoReporteActual })
         });
-        const data = await res.json();
+
+        let data;
+        try {
+            data = await res.json();
+        } catch (parseErr) {
+            data = { respuesta: 'El servidor respondió de forma inesperada. Intenta de nuevo en un momento.', fuentes: [] };
+        }
+
+        const respuestaSegura = escaparHTML(data.respuesta || 'No obtuve respuesta. Intenta de nuevo.');
         const fuentesHTML = (data.fuentes && data.fuentes.length)
-            ? `<div class="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-400">Fuentes consultadas: ${data.fuentes.map(f => `<a href="${f}" target="_blank" rel="noopener" class="underline hover:text-teal">${f}</a>`).join(' · ')}</div>`
+            ? `<div class="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-400 break-all">Fuentes: ${data.fuentes.map(f => `<a href="${f}" target="_blank" rel="noopener" class="underline hover:text-teal">${new URL(f).hostname.replace('www.', '')}</a>`).join(' · ')}</div>`
             : '';
-        document.getElementById(idTemp).outerHTML = `<div class="self-start bg-white border border-slate-200 text-navy px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm">${data.respuesta}${fuentesHTML}</div>`;
+        document.getElementById(idTemp).outerHTML = `<div class="self-start bg-white border border-slate-200 text-navy px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm break-words whitespace-pre-wrap">${respuestaSegura}${fuentesHTML}</div>`;
     } catch (error) {
-        document.getElementById(idTemp).outerHTML = `<div class="self-start bg-red-50 text-red-600 px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm">Error de conexión.</div>`;
+        document.getElementById(idTemp).outerHTML = `<div class="self-start bg-red-50 text-red-600 px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm">No pude conectarme al asistente. Revisa tu conexión e intenta de nuevo.</div>`;
     }
     historial.scrollTop = historial.scrollHeight;
 };
@@ -387,7 +419,7 @@ window.exportarExcel = function() {
             if(!card) return;
             const tipo = document.getElementById(`tipo-${ri}-${pi}`)?.value || '';
             const num = document.getElementById(`num-${ri}-${pi}`)?.value || '';
-            
+
             if (!tipo || !num.trim()) ok = false;
 
             filas.push({
@@ -428,7 +460,7 @@ window.exportarPDF = function() {
 
     const tituloOriginal = document.title;
     document.title = (reportes[0]?.titulo || "Informe_SARLAFT").replace(/[^\w]/g, "_");
-    
+
     document.getElementById('asistente-flotante').classList.add('hidden');
     window.print();
     document.title = tituloOriginal;

@@ -191,7 +191,7 @@
                 <button onclick="window.exportarPDF()" class="text-red-600 font-bold hover:bg-red-50 text-sm px-3 py-2 bg-white rounded border border-slate-300 shadow-sm transition-colors"><i class="fa-solid fa-file-pdf"></i> Imprimir PDF</button>
             </div>
         </div>
-        
+
         <div class="max-w-5xl mx-auto p-8 mt-4">
             <!-- El reporte idéntico a la versión 1 (generado por app.js) se inyecta aquí -->
             <div id="reportes-container" class="panel-cristal border border-slate-200/70 rounded-2xl p-8"></div>
@@ -205,12 +205,12 @@
                     <h3 class="font-bold text-sm"><i class="fa-solid fa-robot text-teal mr-2"></i> Asistente Investigativo</h3>
                     <button onclick="window.toggleChat()" class="text-slate-300 hover:text-white transition-colors"><i class="fa-solid fa-xmark text-lg"></i></button>
                 </div>
-                <div id="chat-historial" class="flex-1 overflow-y-auto p-4 bg-slate-50 text-sm flex flex-col gap-2">
+                <div id="chat-historial" class="flex-1 overflow-y-auto p-4 bg-slate-50 text-sm flex flex-col gap-2 min-w-0">
                     <div class="text-center text-teal text-xs mb-3 border-b pb-2">Reporte cargado. Asistente listo para responder.</div>
                 </div>
-                <div class="p-3 bg-white border-t border-slate-200 flex gap-2">
-                    <input type="text" id="chat-input" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal transition-colors" placeholder="Consulta sobre el reporte...">
-                    <button onclick="window.enviarPregunta()" class="bg-teal hover:bg-teal-700 text-white px-4 rounded-lg transition-colors shadow-sm"><i class="fa-solid fa-paper-plane"></i></button>
+                <div class="p-3 bg-white border-t border-slate-200 flex gap-2 items-end">
+                    <textarea id="chat-input" rows="1" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal transition-colors resize-none max-h-28 overflow-y-auto leading-snug mb-0" placeholder="Consulta sobre el reporte... (Enter para enviar, Shift+Enter para nueva línea)"></textarea>
+                    <button onclick="window.enviarPregunta()" class="bg-teal hover:bg-teal-700 text-white w-10 h-10 flex items-center justify-center rounded-lg transition-colors shadow-sm shrink-0"><i class="fa-solid fa-paper-plane"></i></button>
                 </div>
             </div>
             <!-- Botón Burbuja -->
