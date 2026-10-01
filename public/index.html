@@ -138,7 +138,7 @@
             <p class="text-slate-400 max-w-2xl mx-auto text-lg">Plataforma corporativa para debida diligencia, investigación web profunda y perfilamiento de riesgo.</p>
         </div>
 
-        <div class="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl w-full px-4">
+        <div class="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl w-full px-4">
             <button onclick="window.navegarA('view-noticias')" class="group text-left bg-slate-800/50 border border-slate-700 hover:border-teal rounded-2xl p-8 transition-all hover:-translate-y-2 relative overflow-hidden shadow-lg">
                 <div class="w-12 h-12 rounded-lg bg-teal/20 text-teal flex items-center justify-center mb-6 text-xl"><i class="fa-solid fa-newspaper"></i></div>
                 <h3 class="text-xl font-bold text-white mb-2">Análisis de Noticias</h3>
@@ -156,6 +156,13 @@
                 <h3 class="text-xl font-bold text-white mb-2">Cruce Masivo</h3>
                 <p class="text-slate-400 text-sm">Análisis multimodal. Evaluación financiera instantánea a partir de documentos gráficos.</p>
             </button>
+
+            <button onclick="window.abrirCapturador()" class="group text-left bg-slate-800/50 border border-slate-700 hover:border-emerald-500 rounded-2xl p-8 transition-all hover:-translate-y-2 relative overflow-hidden shadow-lg">
+                <div class="w-12 h-12 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-6 text-xl"><i class="fa-solid fa-table-list"></i></div>
+                <h3 class="text-xl font-bold text-white mb-2">Capturador 2026</h3>
+                <p class="text-slate-400 text-sm">Registro validado de casos del comité con listas dependientes y exportación a la base maestra.</p>
+            </button>
+
         </div>
     </div>
 
@@ -376,6 +383,42 @@
         </div>
     </div>
 
+        <div id="view-capturador" class="hidden min-h-screen superficie-app text-slate-900 pb-20 fade-in">
+        <div class="barra-cristal border-b border-slate-200/70 px-6 py-4 flex justify-between items-center sticky top-0 z-50 no-print">
+            <h2 class="text-lg font-bold text-navy"><i class="fa-solid fa-table-list text-emerald-600 mr-2"></i> Capturador 2026</h2>
+            <button onclick="window.navegarA('view-menu')" class="text-sm font-semibold text-slate-500 hover:text-navy"><i class="fa-solid fa-arrow-left mr-1"></i> Volver al Menú</button>
+        </div>
+        <div class="max-w-6xl mx-auto p-6 mt-6">
+            <div class="flex gap-2 mb-4">
+                <button id="capt-tab-n" onclick="window.captTab('n')" class="bg-navy text-white px-4 py-2 rounded-lg text-sm font-bold">Nuevo registro</button>
+                <button id="capt-tab-l" onclick="window.captTab('l')" class="bg-slate-200 text-navy px-4 py-2 rounded-lg text-sm font-bold">Registros y exportación</button>
+            </div>
+            <div id="capt-nuevo" class="panel-cristal border border-slate-200/70 rounded-2xl p-8">
+                <div id="capt-form" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+                <datalist id="dl-ofi"></datalist>
+                <div id="capt-msg" class="text-sm mt-4"></div>
+                <button id="capt-guardar" onclick="window.captGuardar()" class="bg-navy hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-bold mt-4">Guardar registro</button>
+            </div>
+            <div id="capt-lista" class="hidden panel-cristal border border-slate-200/70 rounded-2xl p-6">
+                <div class="flex flex-wrap items-center gap-3 mb-4">
+                    <select id="capt-filtro" onchange="window.captCargar()" class="border border-slate-300 rounded p-2 text-sm">
+                        <option value="p">Pendientes de exportar</option>
+                        <option value="t">Todos</option>
+                    </select>
+                    <span id="capt-count" class="text-xs text-slate-500"></span>
+                    <button onclick="window.captExcel()" class="bg-navy hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold ml-auto"><i class="fa-solid fa-file-excel mr-1"></i> Descargar Excel</button>
+                    <button onclick="window.captCopiar()" class="bg-teal text-white px-4 py-2 rounded-lg text-sm font-bold"><i class="fa-solid fa-copy mr-1"></i> Copiar filas</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-navy text-white"><tr><th class="p-2">Creado</th><th class="p-2">COD</th><th class="p-2">Año</th><th class="p-2"># RIS</th><th class="p-2">Decisión</th><th class="p-2">Cliente</th><th class="p-2">Analista</th><th class="p-2">Estado</th></tr></thead>
+                        <tbody id="capt-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="./js/auth.js"></script>
     <script>SarlaftAuth.requireSession();</script>
     <script src="./js/data-network-bg.js"></script>
@@ -383,5 +426,9 @@
     <script src="./js/app.js"></script>
     <script src="./js/ros-docx.js"></script>
     <script src="./js/ros.js"></script>
+    <script src="./js/capturador-listas.js"></script>
+    <script src="./js/capturador.js"></script>
+
+
 </body>
 </html>
