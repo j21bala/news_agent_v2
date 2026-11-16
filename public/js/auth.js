@@ -72,5 +72,17 @@ window.SarlaftAuth = (function () {
         return res;
     }
 
-    return { requireSession, redirectIfLoggedIn, login, logout, authFetch, getSession };
+    // Cliente Supabase directo (las tablas están protegidas por RLS por analista).
+    async function db() { return initSupabase(); }
+    async function usuario() { const s = await getSession(); return s ? s.user : null; }
+
+    // Cierre automático por inactividad (20 min) para proteger información sensible.
+    (function inactividad() {
+        const LIMITE = 20 * 60 * 1000; let t;
+        const reset = () => { clearTimeout(t); t = setTimeout(() => { if (cachedSession) logout(); }, LIMITE); };
+        ['mousemove', 'keydown', 'click', 'touchstart'].forEach(e => window.addEventListener(e, reset, { passive: true }));
+        reset();
+    })();
+
+    return { requireSession, redirectIfLoggedIn, login, logout, authFetch, getSession, db, usuario };
 })();
