@@ -6,6 +6,8 @@
     <title>Plataforma de Inteligencia SARLAFT</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="./css/casos.css">
+    <link rel="stylesheet" href="./css/noticias.css">
+    <link rel="stylesheet" href="./css/menu.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -111,44 +113,35 @@
 <body class="bg-navy text-slate-100 font-sans min-h-screen selection:bg-teal selection:text-white">
 
     <!-- ================= MENÚ PRINCIPAL ================= -->
-    <div id="view-menu" class="relative min-h-screen flex flex-col items-center justify-center p-6 fade-in overflow-hidden">
-        <div id="escenario-landing" aria-hidden="true">
-            <canvas id="data-bg-canvas"></canvas>
-        </div>
-
-        <div class="relative z-10 w-full flex justify-end px-4 mb-4">
-            <div class="flex items-center gap-3 bg-slate-800/60 border border-slate-700 rounded-full px-4 py-1.5 text-xs text-slate-300">
-                <i class="fa-solid fa-user-shield"></i>
-                <span id="usuario-actual">—</span>
-                <button onclick="SarlaftAuth.logout()" class="text-red-400 hover:text-red-300 font-semibold ml-2">Cerrar sesión</button>
+    <div id="view-menu" class="mn-root">
+        <canvas id="mn-canvas" aria-hidden="true"></canvas>
+        <div class="mn-aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="mn-grid" aria-hidden="true"></div><div class="mn-vig" aria-hidden="true"></div><div class="mn-scan" aria-hidden="true"></div>
+        <header class="mn-top">
+            <div class="mn-brand"><img src="./img/logo.png" alt=""><div><b>SARLAFT</b><span>INTELLIGENCE</span></div></div>
+            <div class="mn-chips"><span><i class="mn-dot"></i>Sistemas operativos</span><span><i class="fa-solid fa-shield-halved"></i>Datos aislados por analista</span><span id="mn-clock" class="mn-mono">--:--:--</span></div>
+            <div class="mn-user"><i class="fa-solid fa-user-shield"></i><span id="usuario-actual">—</span><button onclick="SarlaftAuth.logout()">Salir</button></div>
+        </header>
+        <main class="mn-hero">
+            <p class="mn-eyebrow">CENTRO DE INTELIGENCIA · CUMPLIMIENTO Y RIESGO</p>
+            <h1 class="mn-title"><span>Inteligencia</span> <em>SARLAFT</em></h1>
+            <p class="mn-type"><span id="mn-typed"></span><i class="mn-caret"></i></p>
+            <div class="mn-cards">
+                <button class="mn-card" data-go="noticias" style="--a:#38bdd0;--i:0"><span class="mn-glow"></span><span class="mn-idx">01</span>
+                    <div class="mn-ico"><i class="fa-solid fa-newspaper"></i><u></u></div><h3>Análisis de Noticias</h3>
+                    <p>Investigación web profunda, extracción de entidades, debida diligencia y asistente con IA en tiempo real.</p>
+                    <div class="mn-stat"><b data-stat="noticias">0</b><small>sesiones en tu historial</small></div><span class="mn-go">Abrir módulo <i class="fa-solid fa-arrow-right"></i></span></button>
+                <button class="mn-card" data-go="cruce" style="--a:#a78bfa;--i:1"><span class="mn-glow"></span><span class="mn-idx">02</span>
+                    <div class="mn-ico"><i class="fa-solid fa-id-card"></i><u></u></div><h3>Cruce Masivo</h3>
+                    <p>Lectura multimodal de documentos y pantallazos, consolidación de perfil y evaluación financiera instantánea.</p>
+                    <div class="mn-stat"><b data-stat="cruce">0</b><small>cruces en tu historial</small></div><span class="mn-go">Abrir módulo <i class="fa-solid fa-arrow-right"></i></span></button>
+                <button class="mn-card" data-go="casos" style="--a:#e0b83a;--i:2"><span class="mn-glow"></span><span class="mn-idx">03</span>
+                    <div class="mn-ico"><i class="fa-solid fa-diagram-project"></i><u></u></div><h3>Casos de Investigación</h3>
+                    <p>Mapa de vínculos, transacciones, cronología, evidencias con cadena de custodia e informe tipo ROS.</p>
+                    <div class="mn-stat"><b data-stat="casos">0</b><small>casos activos</small></div><span class="mn-go">Abrir módulo <i class="fa-solid fa-arrow-right"></i></span></button>
             </div>
-        </div>
-
-        <div class="relative z-10 text-center mb-16">
-            <img src="./img/logo.png" alt="Logo" class="logo-flotante mx-auto w-16 h-16 mb-6 drop-shadow-[0_0_18px_rgba(56,189,208,0.35)]">
-            <h1 class="font-display text-4xl md:text-5xl font-semibold tracking-tight mb-4 text-transparent bg-clip-text bg-gradient-to-r from-teal via-sky-400 to-ink">
-                Inteligencia SARLAFT
-            </h1>
-            <p class="text-slate-400 max-w-2xl mx-auto text-lg">Plataforma corporativa para debida diligencia, investigación web profunda y perfilamiento de riesgo.</p>
-        </div>
-
-        <div class="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl w-full px-4">
-            <button onclick="window.navegarA('view-noticias')" class="group text-left bg-slate-800/50 border border-slate-700 hover:border-teal rounded-2xl p-8 transition-all hover:-translate-y-2 shadow-lg">
-                <div class="w-12 h-12 rounded-lg bg-teal/20 text-teal flex items-center justify-center mb-6 text-xl"><i class="fa-solid fa-newspaper"></i></div>
-                <h3 class="text-xl font-bold text-white mb-2">Análisis de Noticias</h3>
-                <p class="text-slate-400 text-sm">Investigación web con Tavily, extracción de entidades e informe ejecutivo. Se guarda en tu historial.</p>
-            </button>
-            <button onclick="window.navegarA('view-cliente')" class="group text-left bg-slate-800/50 border border-slate-700 hover:border-purple-500 rounded-2xl p-8 transition-all hover:-translate-y-2 shadow-lg">
-                <div class="w-12 h-12 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center mb-6 text-xl"><i class="fa-solid fa-id-card"></i></div>
-                <h3 class="text-xl font-bold text-white mb-2">Cruce Masivo</h3>
-                <p class="text-slate-400 text-sm">Análisis multimodal de documentos gráficos y evaluación financiera instantánea. Con historial.</p>
-            </button>
-            <button onclick="window.abrirCasos()" class="group text-left bg-slate-800/50 border border-slate-700 hover:border-gold rounded-2xl p-8 transition-all hover:-translate-y-2 shadow-lg">
-                <div class="w-12 h-12 rounded-lg bg-gold/20 text-gold flex items-center justify-center mb-6 text-xl"><i class="fa-solid fa-diagram-project"></i></div>
-                <h3 class="text-xl font-bold text-white mb-2">Casos de Investigación</h3>
-                <p class="text-slate-400 text-sm">Espacio seguro por analista: mapa de vínculos, transacciones, cronología, evidencias e informe tipo ROS.</p>
-            </button>
-        </div>
+        </main>
+        <footer class="mn-foot"><div class="mn-ticker"><div><span>LISTAS RESTRICTIVAS</span><span>PEP</span><span>NOTICIAS ADVERSAS</span><span>BENEFICIARIO FINAL</span><span>OPERACIONES INUSUALES</span><span>ROS</span><span>DEBIDA DILIGENCIA</span><span>FRACCIONAMIENTO</span><span>LISTAS RESTRICTIVAS</span><span>PEP</span><span>NOTICIAS ADVERSAS</span><span>BENEFICIARIO FINAL</span><span>OPERACIONES INUSUALES</span><span>ROS</span><span>DEBIDA DILIGENCIA</span><span>FRACCIONAMIENTO</span></div></div><span class="mn-keys">Atajos <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></span></footer>
     </div>
 
     <!-- ================= VISTA 1: INGRESAR NOTICIAS ================= -->
@@ -193,7 +186,7 @@
         <!-- ================= WIDGET ASISTENTE FLOTANTE ================= -->
         <div id="asistente-flotante" class="fixed bottom-6 right-6 z-50 hidden no-print">
             <!-- Panel Desplegable del Chat -->
-            <div id="panel-chat" class="hidden mb-4 w-80 md:w-96 panel-cristal border border-slate-200/70 shadow-2xl rounded-2xl overflow-hidden flex-col h-[500px] fade-in">
+            <div id="panel-chat" class="hidden mb-4 w-[92vw] sm:w-[27rem] panel-cristal border border-slate-200/70 shadow-2xl rounded-2xl overflow-hidden flex-col h-[72vh] max-h-[640px] fade-in">
                 <div class="bg-navy text-white px-4 py-3 flex justify-between items-center">
                     <h3 class="font-bold text-sm"><i class="fa-solid fa-robot text-teal mr-2"></i> Asistente Investigativo</h3>
                     <button onclick="window.toggleChat()" class="text-slate-300 hover:text-white transition-colors"><i class="fa-solid fa-xmark text-lg"></i></button>
@@ -313,7 +306,7 @@
 
     <script src="./js/auth.js"></script>
     <script>SarlaftAuth.requireSession();</script>
-    <script src="./js/data-network-bg.js"></script>
+    <script src="./js/menu.js"></script>
     <script src="./js/cliente.js"></script>
     <script src="./js/app.js"></script>
     <script src="./js/historial.js"></script>

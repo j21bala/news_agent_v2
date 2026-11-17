@@ -3,16 +3,13 @@ let noticiaCount = 0;
 let contextoReporteActual = null;
 
 window.navegarA = function(idVista) {
-    const vistas = ['view-menu', 'view-noticias', 'view-reporte', 'view-ros', 'view-cliente'];
-    vistas.forEach(vista => {
-        const el = document.getElementById(vista);
-        if (el) el.classList.add('hidden');
-    });
+    document.querySelectorAll('[id^="view-"]').forEach(el => el.classList.add('hidden'));
     const destino = document.getElementById(idVista);
     if (destino) {
         destino.classList.remove('hidden');
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+    if (idVista === 'view-menu' && window.menuActivar) window.menuActivar();
 };
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -131,6 +128,28 @@ window.analizarTodas = async function() {
     renderTodosReportes();
     window.navegarA('view-reporte');
     document.getElementById('asistente-flotante').classList.remove('hidden');
+
+    // Guardar la sesión en el historial del analista (incluye el chat).
+    window.__chatLog = [];
+    const ch = document.getElementById('chat-historial');
+    if (ch) ch.innerHTML = '<div class="text-center text-teal text-xs mb-3 border-b pb-2">Reporte cargado. Asistente listo para responder.</div>';
+    try {
+        await Historial.nueva('noticias', (reportes[0] && reportes[0].titulo) || 'Análisis de noticias',
+            () => { guardarManual(); return { reportes, fuentes: noticias, chat: window.__chatLog }; });
+    } catch (e) { console.warn('Historial:', e); }
+};
+
+window.restaurarNoticias = function(p, id, titulo) {
+    reportes = p.reportes || [];
+    contextoReporteActual = reportes[0] || null;
+    window.__chatLog = p.chat || [];
+    renderTodosReportes();
+    document.querySelectorAll('.persona-card').forEach(aplicarManual);
+    window.navegarA('view-reporte');
+    document.getElementById('asistente-flotante').classList.remove('hidden');
+    const h = document.getElementById('chat-historial');
+    h.innerHTML = window.__chatLog.map(m => burbuja(m.r, m.t, m.f)).join('') || '<div class="text-center text-teal text-xs mb-3 border-b pb-2">Sesión restaurada.</div>';
+    Historial.adoptar('noticias', id, titulo, () => { guardarManual(); return { reportes, fuentes: p.fuentes || [], chat: window.__chatLog }; });
 };
 
 window.volverNoticias = function() {
@@ -169,7 +188,7 @@ function resaltar(texto) {
 }
 
 function buildReporteHTML(data, ri) {
-    const personasHTML = (data.personas || []).map((p, pi) => buildPersonaHTML(p, ri, pi)).join('');
+    const personasHTML = (data.personas || []).map((p, pi) => p.eliminada ? '' : buildPersonaHTML(p, ri, pi)).join('');
     const iconos = {
         cal: '<i class="fa-solid fa-calendar text-teal mr-1"></i>',
         lug: '<i class="fa-solid fa-location-dot text-teal mr-1"></i>',
@@ -236,7 +255,25 @@ function filaTablaHTML(tipo, num, bcs, fid, prodbcs, prodfid, estado) {
     </tr>`;
 }
 
+const VINCULOS = ['Investigado', 'Capturado', 'Imputado', 'Condenado', 'Absuelto', 'Víctima', 'Testigo', 'Representante legal', 'Socio / accionista', 'Familiar', 'Funcionario', 'Contratista', 'Otro'];
+function chipsExtra(p) {
+    const x = p.extra || {}, e = escaparHTML;
+    const c = [['Alias', x.alias], ['Nacionalidad', x.nacionalidad], ['Nac.', x.fecha_nacimiento], ['Vínculo', x.vinculo], ['PEP', x.pep ? 'Sí' + (x.cargo_pep ? ' · ' + x.cargo_pep : '') : ''], ['Entidad', x.entidad], ['Ciudad', x.ciudad],
+        ['Valor', x.valor ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(x.valor) : ''], ['Fecha hecho', x.fecha_hecho], ['Obs.', x.obs]].filter(i => i[1]);
+    return c.map(i => `<span class="text-[11px] bg-slate-100 border border-slate-200 text-slate-700 rounded-full px-2.5 py-1"><b>${i[0]}:</b> ${e(i[1])}</span>`).join('');
+}
 function buildPersonaHTML(p, ri, pi) {
+    const ex = k => escaparHTML((p.extra && p.extra[k]) ?? '');
+    const cls = 'w-full border border-slate-300 rounded p-2 text-sm focus:border-navy outline-none';
+    const inp = (k, l, t = 'text', ph = '') => `<div><label class="block text-xs font-bold text-slate-600 mb-1">${l}</label><input type="${t}" data-x="${k}" value="${ex(k)}" placeholder="${ph}" oninput="window.setExtra(${ri},${pi},this)" class="${cls}"></div>`;
+    const extraForm = `<div class="mb-4 pb-4 border-b border-slate-200"><h4 class="font-bold text-xs text-navy mb-3 uppercase tracking-wider">Datos adicionales del involucrado</h4>
+        <div class="grid grid-cols-2 gap-3 mb-3">${inp('alias', 'Alias / otros nombres')}${inp('nacionalidad', 'Nacionalidad')}${inp('fecha_nacimiento', 'Fecha de nacimiento', 'date')}
+        <div><label class="block text-xs font-bold text-slate-600 mb-1">Tipo de vínculo</label><select data-x="vinculo" onchange="window.setExtra(${ri},${pi},this)" class="${cls}"><option value="">Seleccionar...</option>${VINCULOS.map(v => `<option ${ex('vinculo') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+        ${inp('entidad', 'Empresa / entidad relacionada')}${inp('ciudad', 'Ciudad / departamento')}${inp('valor', 'Valor involucrado (COP)', 'number')}${inp('fecha_hecho', 'Fecha del hecho', 'date')}
+        <div><label class="block text-xs font-bold text-slate-600 mb-1">Nivel de riesgo (analista)</label><select data-x="nivel" onchange="window.setExtra(${ri},${pi},this)" class="${cls}"><option value="">Sugerido por IA</option>${['alto', 'medio', 'bajo'].map(v => `<option value="${v}" ${ex('nivel') === v ? 'selected' : ''}>${v[0].toUpperCase() + v.slice(1)}</option>`).join('')}</select></div>
+        ${inp('fuente', 'Fuente / URL de soporte', 'url', 'https://…')}</div>
+        <div class="flex gap-4 items-end mb-3"><label class="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer"><input type="checkbox" data-x="pep" ${p.extra && p.extra.pep ? 'checked' : ''} onchange="window.setExtra(${ri},${pi},this)"> Es PEP</label><div class="flex-1">${inp('cargo_pep', 'Cargo PEP', 'text', 'Ej. Alcalde, congresista')}</div></div>
+        <div><label class="block text-xs font-bold text-slate-600 mb-1">Observaciones</label><textarea data-x="obs" rows="2" oninput="window.setExtra(${ri},${pi},this)" class="${cls}">${ex('obs')}</textarea></div></div>`;
     const nivelRaw = String(p.nivel_riesgo_sugerido || 'medio').toLowerCase().trim();
     let badgeStyle = 'background-color: #b9770e !important; color: white !important;';
     if (nivelRaw === 'alto') badgeStyle = 'background-color: #b3261e !important; color: white !important;';
@@ -263,6 +300,8 @@ function buildPersonaHTML(p, ri, pi) {
             <div><strong class="text-slate-800">Análisis de riesgo:</strong> ${resaltar(p.analisis_riesgo)}</div>
             <div class="text-xs text-slate-500 italic mt-2"><strong class="text-slate-600">¿Por qué este nivel?</strong> ${resaltar(p.justificacion_riesgo) || 'No especificado'}</div>
         </div>
+
+        <div id="extra-view-${ri}-${pi}" class="flex flex-wrap gap-2 mb-4">${chipsExtra(p)}</div>
 
         <div class="tabla-datos mt-4 overflow-x-auto rounded border">
             <table class="w-full text-left text-xs">
@@ -309,6 +348,7 @@ function buildPersonaHTML(p, ri, pi) {
                 <label class="block text-xs font-bold text-slate-600 mb-1">Editar nombre del involucrado</label>
                 <input type="text" id="nombre-edit-${ri}-${pi}" value="${p.nombre || ''}" class="w-full border border-slate-300 rounded p-2 text-sm focus:border-navy outline-none" placeholder="Nombre completo" oninput="document.getElementById('nombre-display-${ri}-${pi}').textContent=this.value">
             </div>
+            ${extraForm}
             <div>
                 <label class="block text-xs font-bold text-slate-600 mb-1">Recomendación del analista para el Comité</label>
                 <textarea id="recom-${ri}-${pi}" class="w-full border border-slate-300 rounded p-3 text-sm h-20 focus:border-navy outline-none" placeholder="Escribe tu recomendación..." oninput="window.actualizarRecomendacion(${ri},${pi})"></textarea>
@@ -359,7 +399,9 @@ window.agregarPersona = function(ri) {
 };
 
 window.eliminarPersona = function(ri, pi) {
+    if (reportes[ri]?.personas?.[pi]) reportes[ri].personas[pi].eliminada = true;
     document.getElementById(`persona-${ri}-${pi}`)?.remove();
+    Historial.sync('noticias');
 };
 
 function escaparHTML(texto) {
@@ -367,46 +409,6 @@ function escaparHTML(texto) {
     div.textContent = texto;
     return div.innerHTML;
 }
-
-window.enviarPregunta = async function() {
-    const input = document.getElementById('chat-input');
-    const pregunta = input.value.trim();
-    if (!pregunta) return;
-    if (!contextoReporteActual) return alert("Primero debes generar un reporte.");
-
-    const historial = document.getElementById('chat-historial');
-    historial.innerHTML += `<div class="self-end bg-navy text-white px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm break-words whitespace-pre-wrap">${escaparHTML(pregunta)}</div>`;
-    input.value = '';
-    input.style.height = 'auto';
-
-    const idTemp = 'temp-' + Date.now();
-    historial.innerHTML += `<div id="${idTemp}" class="self-start bg-slate-200 text-slate-500 px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm"><i class="fa-solid fa-ellipsis fa-fade"></i></div>`;
-    historial.scrollTop = historial.scrollHeight;
-
-    try {
-        const res = await SarlaftAuth.authFetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pregunta, contexto: contextoReporteActual })
-        });
-
-        let data;
-        try {
-            data = await res.json();
-        } catch (parseErr) {
-            data = { respuesta: 'El servidor respondió de forma inesperada. Intenta de nuevo en un momento.', fuentes: [] };
-        }
-
-        const respuestaSegura = escaparHTML(data.respuesta || 'No obtuve respuesta. Intenta de nuevo.');
-        const fuentesHTML = (data.fuentes && data.fuentes.length)
-            ? `<div class="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-400 break-all">Fuentes: ${data.fuentes.map(f => `<a href="${f}" target="_blank" rel="noopener" class="underline hover:text-teal">${new URL(f).hostname.replace('www.', '')}</a>`).join(' · ')}</div>`
-            : '';
-        document.getElementById(idTemp).outerHTML = `<div class="self-start bg-white border border-slate-200 text-navy px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm break-words whitespace-pre-wrap">${respuestaSegura}${fuentesHTML}</div>`;
-    } catch (error) {
-        document.getElementById(idTemp).outerHTML = `<div class="self-start bg-red-50 text-red-600 px-3 py-2 rounded-lg text-xs max-w-[85%] mb-2 shadow-sm">No pude conectarme al asistente. Revisa tu conexión e intenta de nuevo.</div>`;
-    }
-    historial.scrollTop = historial.scrollHeight;
-};
 
 window.exportarExcel = function() {
     let ok = true;
@@ -450,19 +452,138 @@ window.exportarExcel = function() {
     XLSX.writeFile(wb, `Reporte_SARLAFT_${hoy.replace(/\//g, '-')}.xlsx`);
 };
 
-window.exportarPDF = function() {
-    let ok = true;
+
+
+// ---------- Persistencia de lo que el analista completa a mano ----------
+window.setExtra = function(ri, pi, el) {
+    const p = reportes[ri]?.personas?.[pi]; if (!p) return;
+    (p.extra = p.extra || {})[el.dataset.x] = el.type === 'checkbox' ? el.checked : el.value;
+    if (el.dataset.x === 'nivel' && el.value) { p.nivel_riesgo_sugerido = el.value; return refrescarPersona(ri, pi); }
+    const v = document.getElementById(`extra-view-${ri}-${pi}`); if (v) v.innerHTML = chipsExtra(p);
+};
+function refrescarPersona(ri, pi) {
+    guardarManual();
+    const card = document.getElementById(`persona-${ri}-${pi}`); if (!card) return;
+    const t = document.createElement('div'); t.innerHTML = buildPersonaHTML(reportes[ri].personas[pi], ri, pi);
+    card.replaceWith(t.firstElementChild); aplicarManual(document.getElementById(`persona-${ri}-${pi}`));
+}
+function guardarManual() {
     document.querySelectorAll('.persona-card').forEach(card => {
-        const [ri, pi] = card.id.replace('persona-', '').split('-');
-        if (!document.getElementById(`tipo-${ri}-${pi}`)?.value || !document.getElementById(`num-${ri}-${pi}`)?.value.trim()) ok = false;
+        const [ri, pi] = card.id.replace('persona-', '').split('-'); const p = reportes[ri]?.personas?.[pi]; if (!p) return;
+        const m = {}; card.querySelectorAll('.edit-fields [id]').forEach(e => { m[e.id.replace(/-\d+-\d+$/, '')] = e.type === 'checkbox' ? e.checked : e.value; });
+        p.manual = m;
     });
-    if (!ok) return alert("Completa el Tipo y Número de identificación de todos los involucrados antes de exportar el PDF.");
+}
+function aplicarManual(card) {
+    if (!card) return; const [ri, pi] = card.id.replace('persona-', '').split('-'); const m = reportes[ri]?.personas?.[pi]?.manual; if (!m) return;
+    Object.entries(m).forEach(([k, v]) => { const e = document.getElementById(`${k}-${ri}-${pi}`); if (!e) return; if (e.type === 'checkbox') e.checked = !!v; else e.value = v; });
+    if (m['nombre-edit']) { const d = document.getElementById(`nombre-display-${ri}-${pi}`); if (d) d.textContent = m['nombre-edit']; }
+    window.actualizarTabla(+ri, +pi); window.actualizarRecomendacion(+ri, +pi);
+}
+document.addEventListener('input', e => {
+    if (!e.target.closest || !e.target.closest('#reportes-container')) return;
+    clearTimeout(window.__gm); window.__gm = setTimeout(() => { guardarManual(); Historial.sync('noticias'); }, 900);
+});
 
-    const tituloOriginal = document.title;
-    document.title = (reportes[0]?.titulo || "Informe_SARLAFT").replace(/[^\w]/g, "_");
+// ---------- Markdown seguro para el chat ----------
+function mdSeguro(t) {
+    const L = escaparHTML(String(t || '')).split('\n'), out = []; let i = 0;
+    const inl = x => x.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>').replace(/`([^`]+)`/g, '<code>$1</code>').replace(/(https?:\/\/[^\s<)]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+    const tr = /^\s*\|.*\|\s*$/, li = /^\s*[-*•]\s+/, ol = /^\s*\d+[.)]\s+/;
+    while (i < L.length) {
+        const l = L[i];
+        if (tr.test(l)) { const r = []; while (i < L.length && tr.test(L[i])) r.push(L[i++]); const rows = r.filter(x => !/^[\s|:-]+$/.test(x)).map(x => x.trim().replace(/^\||\|$/g, '').split('|').map(c => inl(c.trim())));
+            if (rows.length) out.push('<table><thead><tr>' + rows[0].map(c => `<th>${c}</th>`).join('') + '</tr></thead><tbody>' + rows.slice(1).map(r2 => '<tr>' + r2.map(c => `<td>${c}</td>`).join('') + '</tr>').join('') + '</tbody></table>'); }
+        else if (li.test(l)) { const it = []; while (i < L.length && li.test(L[i])) it.push(inl(L[i++].replace(li, ''))); out.push('<ul>' + it.map(x => `<li>${x}</li>`).join('') + '</ul>'); }
+        else if (ol.test(l)) { const it = []; while (i < L.length && ol.test(L[i])) it.push(inl(L[i++].replace(ol, ''))); out.push('<ol>' + it.map(x => `<li>${x}</li>`).join('') + '</ol>'); }
+        else if (/^#{1,4}\s+/.test(l)) { out.push(`<div class="md-h">${inl(l.replace(/^#{1,4}\s+/, ''))}</div>`); i++; }
+        else if (!l.trim()) i++; else { out.push(`<p>${inl(l)}</p>`); i++; }
+    }
+    return out.join('');
+}
+function fuentesChat(f) {
+    return (f && f.length) ? `<div class="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-400 break-all">Fuentes: ${f.slice(0, 4).map(u => `<a href="${escaparHTML(u)}" target="_blank" rel="noopener noreferrer" class="text-teal hover:underline">${escaparHTML(u.replace(/^https?:\/\/(www\.)?/, '').split('/')[0])}</a>`).join(' · ')}</div>` : '';
+}
+function burbuja(r, t, f) {
+    return r === 'u'
+        ? `<div class="self-end bg-navy text-white px-3 py-2 rounded-lg text-xs max-w-[88%] mb-2 shadow-sm break-words whitespace-pre-wrap">${escaparHTML(t)}</div>`
+        : `<div class="md self-start bg-white border border-slate-200 text-navy px-3 py-2 rounded-lg text-xs max-w-[92%] mb-2 shadow-sm break-words">${mdSeguro(t)}${fuentesChat(f)}</div>`;
+}
+function resumenContexto(r) {
+    if (!r) return {};
+    return { titulo: r.titulo, fecha: r.fecha, lugar: r.lugar, medio: r.medio, resumen: r.resumen, hechos_clave: r.hechos_clave,
+        personas: (r.personas || []).filter(p => !p.eliminada).map(p => ({ nombre: (p.manual && p.manual['nombre-edit']) || p.nombre, cargo: p.cargo_o_actividad, rol: p.rol_en_hechos, riesgo: p.nivel_riesgo_sugerido, analisis: p.analisis_riesgo, estado: p.estado_proceso, datos_analista: p.extra })) };
+}
+window.enviarPregunta = async function() {
+    const input = document.getElementById('chat-input'), pregunta = input.value.trim();
+    if (!pregunta) return;
+    if (!contextoReporteActual) return alert('Primero debes generar un reporte.');
+    const h = document.getElementById('chat-historial');
+    h.insertAdjacentHTML('beforeend', burbuja('u', pregunta));
+    input.value = ''; input.style.height = 'auto';
+    const b = document.createElement('div');
+    b.className = 'md self-start bg-white border border-slate-200 text-navy px-3 py-2 rounded-lg text-xs max-w-[92%] mb-2 shadow-sm break-words';
+    b.innerHTML = '<span class="chat-typing"><i></i><i></i><i></i></span>'; h.appendChild(b); h.scrollTop = h.scrollHeight;
+    const ctrl = new AbortController(), to = setTimeout(() => ctrl.abort(), 58000);
+    let texto = '', fuentes = [];
+    try {
+        const res = await SarlaftAuth.authFetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl.signal,
+            body: JSON.stringify({ pregunta, contexto: resumenContexto(contextoReporteActual), historial: (window.__chatLog || []).slice(-6).map(m => ({ r: m.r, t: m.t })) }) });
+        if (!res.ok) { let m = 'Error ' + res.status; try { m = (await res.json()).error || m; } catch (_) {} throw new Error(m); }
+        const rd = res.body.getReader(), dec = new TextDecoder(); let buf = '';
+        for (;;) {
+            const { done, value } = await rd.read(); if (done) break;
+            buf += dec.decode(value, { stream: true }); const parts = buf.split('\n\n'); buf = parts.pop();
+            for (const part of parts) {
+                if (!part.startsWith('data: ') || part === 'data: [DONE]') continue;
+                let j; try { j = JSON.parse(part.slice(6)); } catch (_) { continue; }
+                if (j.e) throw new Error(j.e);
+                if (j.f) fuentes = j.f;
+                if (j.t) { texto += j.t; b.innerHTML = mdSeguro(texto) + '<span class="chat-cursor"></span>'; h.scrollTop = h.scrollHeight; }
+            }
+        }
+        if (!texto) throw new Error('La IA no devolvió texto. Intenta de nuevo.');
+        b.innerHTML = mdSeguro(texto) + fuentesChat(fuentes);
+        (window.__chatLog = window.__chatLog || []).push({ r: 'u', t: pregunta }, { r: 'a', t: texto, f: fuentes });
+        Historial.sync('noticias');
+    } catch (e) {
+        window.__ultimaPregunta = pregunta;
+        b.className = 'self-start bg-red-50 text-red-700 px-3 py-2 rounded-lg text-xs max-w-[92%] mb-2 shadow-sm';
+        b.innerHTML = escaparHTML(e.name === 'AbortError' ? 'La respuesta tardó demasiado.' : e.message) + ' <button class="underline font-bold ml-1" onclick="document.getElementById(\'chat-input\').value=window.__ultimaPregunta;window.enviarPregunta()">Reintentar</button>';
+    } finally { clearTimeout(to); h.scrollTop = h.scrollHeight; }
+};
 
-    document.getElementById('asistente-flotante').classList.add('hidden');
-    window.print();
-    document.title = tituloOriginal;
-    document.getElementById('asistente-flotante').classList.remove('hidden');
+// ---------- PDF: documento A4 limpio, independiente de la pantalla ----------
+function construirImpresion() {
+    guardarManual();
+    const e = escaparHTML, cop = n => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(+n || 0);
+    const col = { alto: '#b3261e', medio: '#b9770e', bajo: '#2e7d32' };
+    const bloques = reportes.map(r => {
+        const ps = (r.personas || []).filter(p => !p.eliminada).map(p => {
+            const m = p.manual || {}, x = p.extra || {}, niv = String(p.nivel_riesgo_sugerido || 'medio').toLowerCase();
+            const campos = [['Alias', x.alias], ['Nacionalidad', x.nacionalidad], ['Nacimiento', x.fecha_nacimiento], ['Vínculo', x.vinculo], ['PEP', x.pep ? 'Sí' + (x.cargo_pep ? ' — ' + x.cargo_pep : '') : ''],
+                ['Entidad', x.entidad], ['Ciudad', x.ciudad], ['Valor involucrado', x.valor ? cop(x.valor) : ''], ['Fecha del hecho', x.fecha_hecho], ['Fuente', x.fuente], ['Observaciones', x.obs]].filter(c => c[1]);
+            return `<section class="pr-p"><div class="pr-ph"><b>${e(m['nombre-edit'] || p.nombre || 'Sin identificar')}</b><span class="pr-b" style="background:${col[niv] || '#b9770e'}">${e(niv.toUpperCase())}</span></div>
+                <div class="pr-sub">${e(p.cargo_o_actividad || '')}${p.estado_proceso ? ' · ' + e(p.estado_proceso) : ''}</div>
+                <div><b>Hechos:</b> ${e(p.rol_en_hechos || '—')}</div><div><b>Análisis de riesgo:</b> ${e(p.analisis_riesgo || '—')}</div>${p.justificacion_riesgo ? `<div style="color:#64748b;font-size:9pt"><i>${e(p.justificacion_riesgo)}</i></div>` : ''}
+                ${campos.length ? '<table><tbody>' + campos.map(c => `<tr><th style="width:32%">${c[0]}</th><td>${e(c[1])}</td></tr>`).join('') + '</tbody></table>' : ''}
+                <table><thead><tr><th>Tipo ID</th><th>N.º ID</th><th>Cte. Banco</th><th>Prod. Banco</th><th>Cte. Fid.</th><th>Prod. Fid.</th></tr></thead><tbody><tr><td>${e(m.tipo || '—')}</td><td>${e(m.num || '—')}</td><td>${m.bcs ? 'Sí' : 'No'}</td><td>${e(m.prodbcs || '—')}</td><td>${m.fid ? 'Sí' : 'No'}</td><td>${e(m.prodfid || '—')}</td></tr></tbody></table>
+                ${m.recom ? `<div class="pr-rec"><b>Recomendación del analista:</b> ${e(m.recom).replace(/\n/g, '<br>')}</div>` : ''}</section>`;
+        }).join('');
+        return `<div class="pr-cover"><h1>${e(r.titulo || 'Informe SARLAFT')}</h1><div class="pr-meta">${e(r.fecha || 's/f')} · ${e(r.lugar || 's/d')} · ${e(r.medio || 's/d')}${r._link ? '<br>' + e(r._link) : ''}</div></div>
+            <h2>Resumen general</h2><div>${e(r.resumen || '')}</div>${(r.hechos_clave || []).length ? '<h2>Hechos clave</h2><ul>' + r.hechos_clave.map(h => `<li>${e(h).replace(/\*\*/g, '')}</li>`).join('') + '</ul>' : ''}
+            <h2>Involucrados</h2>${ps || '<p>Sin involucrados.</p>'}${(r.fuentes_consultadas || []).length ? '<h2>Fuentes consultadas</h2><ul class="pr-f">' + r.fuentes_consultadas.map(f => `<li><a>${e(f)}</a></li>`).join('') + '</ul>' : ''}`;
+    }).join('<div style="break-after:page"></div>');
+    let host = document.getElementById('print-reporte'); if (!host) { host = document.createElement('div'); host.id = 'print-reporte'; document.body.appendChild(host); }
+    host.innerHTML = bloques + `<div class="pr-foot">Documento confidencial · Generado por ${e(document.getElementById('usuario-actual')?.textContent || '')} el ${new Date().toLocaleString('es-CO')}. Un hallazgo en prensa no implica responsabilidad penal.</div>`;
+}
+window.exportarPDF = function() {
+    guardarManual();
+    const faltan = [...document.querySelectorAll('.persona-card')].some(c => { const [ri, pi] = c.id.replace('persona-', '').split('-'); return !document.getElementById(`tipo-${ri}-${pi}`)?.value || !document.getElementById(`num-${ri}-${pi}`)?.value.trim(); });
+    if (faltan && !confirm('Hay involucrados sin tipo o número de identificación. ¿Exportar el PDF de todos modos?')) return;
+    construirImpresion();
+    const t = document.title; document.title = (reportes[0]?.titulo || 'Informe_SARLAFT').replace(/[^\w]+/g, '_').slice(0, 60);
+    document.body.classList.add('imprimiendo-rep');
+    window.onafterprint = () => { document.body.classList.remove('imprimiendo-rep'); document.title = t; };
+    setTimeout(() => window.print(), 80);
 };
