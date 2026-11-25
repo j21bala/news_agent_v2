@@ -2,7 +2,11 @@
     "functions": {
         "api/chat.js": {"maxDuration": 60},
         "api/analizar.js":{"maxDuration":60},
-        "api/caso-ia.js": {"maxDuration": 30}
+        "api/caso-ia.js": {"maxDuration": 30},
+        "api/caso-ros-docx.js": {
+            "maxDuration": 30,
+            "includeFiles": "public/plantilla/Plantilla_ROS_base.docx"
+        }
     }
 
 }
