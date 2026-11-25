@@ -237,10 +237,25 @@
     const fechaISO = v => { if (typeof v === 'number') return new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10); const m = String(v).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/); if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; const x = new Date(v); return isNaN(x) ? '' : x.toISOString().slice(0, 10); };
     const num = v => +String(v ?? '').replace(/[^\d.,-]/g, '').replace(/\.(?=\d{3}\b)/g, '').replace(',', '.') || 0;
     function mapFila(r) {
-        const o = {}; Object.entries(r).forEach(([k, v]) => o[norm(k)] = v); const f = (...ks) => { for (const k of ks) { const h = Object.keys(o).find(x => x.includes(k)); if (h !== undefined && o[h] !== '') return o[h]; } return ''; };
-        const c = num(f('credito')), db = num(f('debito')), val = f('valor', 'monto', 'importe');
-        const nat = db && !c ? 'debito' : c && !db ? 'credito' : /deb|retiro|egreso|salida/.test(norm(f('naturaleza', 'tipo mov', 'signo', 'transaccion'))) ? 'debito' : 'credito';
-        return { id: uid(), fecha: fechaISO(f('fecha')), titular: String(f('titular', 'nombre', 'cliente')), producto: String(f('producto')), numero: String(f('numero', 'cuenta')), oficina: String(f('oficina')), tipo: String(f('transaccion', 'tipo') || 'Otro'), nat, valor: c || db || Math.abs(num(val)), contra: String(f('contraparte', 'beneficiario', 'origen')), reportar: false, nota: '' };
+        const o = {}; Object.entries(r).forEach(([k, v]) => o[norm(k)] = v);
+        const f = (...ks) => { for (const k of ks) { const h = Object.keys(o).find(x => x.includes(k)); if (h !== undefined && o[h] !== '') return o[h]; } return ''; };
+        const hojaTrabajo = o.txfecha !== undefined && o.txnaturaleza !== undefined && o.txtotal !== undefined;
+        const c = num(f('credito')), db = num(f('debito')), val = f('valor', 'monto', 'importe', 'total');
+        const naturaleza = norm(f('naturaleza', 'tipo mov', 'signo', 'transaccion'));
+        const nat = db && !c ? 'debito' : c && !db ? 'credito' : (naturaleza === 'd' || /deb|retiro|egreso|salida/.test(naturaleza)) ? 'debito' : 'credito';
+        const nota = hojaTrabajo
+            ? [['Macro código', 'macrocodigo'], ['Código oficina', 'ofcodigo'], ['Comprobante', 'txcomprobante'], ['Cupo', 'txcupo'], ['Efectivo', 'txefectivo']]
+                .map(([label, key]) => o[key] !== '' && o[key] != null ? `${label}: ${o[key]}` : '')
+                .filter(Boolean).join(' · ')
+            : '';
+        return {
+            id: uid(), fecha: fechaISO(f('fecha')),
+            titular: String(hojaTrabajo ? f('clidcliente') : f('titular', 'cliente', 'nombre')),
+            producto: String(f('producto')), numero: String(f('cccuentanum', 'numero', 'cuenta')),
+            oficina: String(f('oficina')), tipo: String(f('ctxnombre', 'transaccion', 'tipo') || 'Otro'),
+            nat, valor: c || db || Math.abs(num(val)),
+            contra: String(f('contraparte', 'beneficiario', 'origen')), reportar: false, nota
+        };
     }
     CS.tabs.tx = el => {
         const d = caso.data, nombres = d.nodos.map(n => `<option value="${esc(n.nombre)}">`).join('');
@@ -261,8 +276,18 @@
         el.querySelector('#t-ord').onclick = () => { d.tx.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '')); CS.dirty('tx'); filas(); };
         el.querySelector('#t-b').onclick = e => { const b = e.target.closest('[data-del]'); if (b) { d.tx.splice(+b.dataset.del, 1); CS.dirty('tx'); filas(); res(); } };
         el.querySelector('#t-xl').onclick = () => { const ws = XLSX.utils.json_to_sheet(d.tx.map(t => ({ Fecha: t.fecha, Titular: t.titular, Producto: t.producto, Número: t.numero, Oficina: t.oficina, Transacción: t.tipo, Naturaleza: t.nat === 'debito' ? 'Débito' : 'Crédito', Valor: t.valor, Contraparte: t.contra, ROS: t.reportar ? 'Sí' : '', Nota: t.nota }))); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Transacciones'); XLSX.writeFile(wb, `${caso.data.meta.numero}_transacciones.xlsx`); CS.audit('exportar_tx'); };
-        el.querySelector('#t-imp').onchange = async e => { const f = e.target.files[0]; if (!f) return; try { const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: false }); const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' }).map(mapFila).filter(t => t.valor);
-            if (!rows.length) return alert('No se reconocieron filas con valor. Revisa los encabezados (fecha, valor/monto, titular, producto…).'); d.tx.push(...rows); CS.dirty('tx'); CS.audit('importar_tx', { filas: rows.length, archivo: f.name }); filas(); res(); CS.toast(`${rows.length} transacciones importadas`); } catch (x) { alert('No se pudo leer el archivo: ' + x.message); } e.target.value = ''; };
+        el.querySelector('#t-imp').onchange = async e => { const f = e.target.files[0]; if (!f) return; try {
+            const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: false });
+            const hoja = wb.SheetNames.find(n => norm(n) === 'exportar hoja de trabajo') || wb.SheetNames[0];
+            const rows = XLSX.utils.sheet_to_json(wb.Sheets[hoja], { defval: '' }).map(mapFila).filter(t => t.valor);
+            if (!rows.length) {
+                alert('No se reconocieron filas con valor. Revisa los encabezados (fecha, valor/monto o TXTOTAL, titular…).');
+                e.target.value = '';
+                return;
+            }
+            d.tx.push(...rows); CS.dirty('tx'); CS.audit('importar_tx', { filas: rows.length, archivo: f.name, hoja }); filas(); res();
+            CS.toast(`${rows.length} transacciones importadas desde "${hoja}"`);
+        } catch (x) { alert('No se pudo leer el archivo: ' + x.message); } e.target.value = ''; };
     };
 
     // ---------- Pestaña: Cronología ----------
