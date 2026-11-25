@@ -7,26 +7,35 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body class="bg-slate-900 min-h-screen flex items-center justify-center px-4">
-    <div class="w-full max-w-sm bg-white rounded-2xl shadow-xl p-8">
-        <h1 class="text-xl font-bold text-slate-800 mb-1">SARLAFT Enterprise</h1>
-        <p class="text-sm text-slate-500 mb-6">Ingresa con tu cuenta corporativa.</p>
+<body class="min-h-screen bg-[#f7f8fa] px-4 text-slate-950 antialiased">
+    <main class="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center py-12">
+        <div class="mb-8">
+            <div class="mb-8 flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-semibold tracking-widest">S</div>
+            <p class="mb-3 text-xs font-medium uppercase tracking-[0.18em] text-slate-500">SARLAFT Intelligence</p>
+            <h1 class="text-3xl font-semibold tracking-tight">Inicia sesión</h1>
+            <p class="mt-2 text-sm leading-6 text-slate-600">Accede a tu espacio de análisis seguro.</p>
+        </div>
 
-        <form id="form-login" class="space-y-4">
+        <form id="form-login" class="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <div>
-                <label class="block text-xs font-semibold text-slate-500 mb-1">Correo</label>
-                <input type="email" id="email" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-800">
+                <label for="email" class="mb-2 block text-sm font-medium text-slate-800">Correo corporativo</label>
+                <input type="email" id="email" name="email" required autocomplete="username"
+                    class="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
             </div>
             <div>
-                <label class="block text-xs font-semibold text-slate-500 mb-1">Contraseña</label>
-                <input type="password" id="password" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-800">
+                <label for="password" class="mb-2 block text-sm font-medium text-slate-800">Contraseña</label>
+                <input type="password" id="password" name="password" required autocomplete="current-password"
+                    class="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
             </div>
-            <button type="submit" id="btn-login" class="w-full bg-slate-900 text-white rounded-lg py-2.5 text-sm font-bold hover:bg-slate-800 transition">
+            <button type="submit" id="btn-login"
+                class="w-full rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60">
                 Entrar
             </button>
-            <p id="login-error" class="text-xs text-red-600 hidden"></p>
+            <p id="login-error" role="alert" class="hidden text-sm text-red-700"></p>
         </form>
-    </div>
+
+        <p class="mt-6 text-center text-xs text-slate-500">Acceso privado para usuarios autorizados</p>
+    </main>
 
     <script src="/js/auth.js"></script>
     <script>

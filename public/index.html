@@ -7,7 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="./css/casos.css">
     <link rel="stylesheet" href="./css/noticias.css">
-    <link rel="stylesheet" href="./css/menu.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -39,43 +38,6 @@
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-
-        /* ---------- Landing: escenario de fondo tipo "red de datos" ---------- */
-        #escenario-landing {
-            position: absolute;
-            inset: 0;
-            overflow: hidden;
-            background:
-                radial-gradient(circle at 18% 22%, rgba(14,147,184,0.20), transparent 42%),
-                radial-gradient(circle at 82% 78%, rgba(18,58,92,0.35), transparent 45%),
-                #0f1b2d;
-        }
-        #escenario-landing::before {
-            content: '';
-            position: absolute;
-            inset: -10%;
-            background:
-                radial-gradient(circle at 30% 30%, rgba(56,189,208,0.16), transparent 38%),
-                radial-gradient(circle at 70% 65%, rgba(56,189,208,0.10), transparent 40%);
-            animation: derivaSuave 22s ease-in-out infinite alternate;
-            filter: blur(30px);
-        }
-        @keyframes derivaSuave {
-            from { transform: translate3d(-2%, -1%, 0) scale(1); }
-            to   { transform: translate3d(2%, 2%, 0) scale(1.06); }
-        }
-        #data-bg-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-
-        .logo-flotante { animation: flotar 6s ease-in-out infinite; }
-        @keyframes flotar {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-6px); }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-            #escenario-landing::before { animation: none; }
-            .logo-flotante { animation: none; }
-        }
 
         /* ---------- Vistas internas: fondo con textura sutil + vidrio ---------- */
         .superficie-app {
@@ -113,35 +75,60 @@
 <body class="bg-navy text-slate-100 font-sans min-h-screen selection:bg-teal selection:text-white">
 
     <!-- ================= MENÚ PRINCIPAL ================= -->
-    <div id="view-menu" class="mn-root">
-        <canvas id="mn-canvas" aria-hidden="true"></canvas>
-        <div class="mn-aurora" aria-hidden="true"><i></i><i></i><i></i></div>
-        <div class="mn-grid" aria-hidden="true"></div><div class="mn-vig" aria-hidden="true"></div><div class="mn-scan" aria-hidden="true"></div>
-        <header class="mn-top">
-            <div class="mn-brand"><img src="./img/logo.png" alt=""><div><b>SARLAFT</b><span>INTELLIGENCE</span></div></div>
-            <div class="mn-chips"><span><i class="mn-dot"></i>Sistemas operativos</span><span><i class="fa-solid fa-shield-halved"></i>Datos aislados por analista</span><span id="mn-clock" class="mn-mono">--:--:--</span></div>
-            <div class="mn-user"><i class="fa-solid fa-user-shield"></i><span id="usuario-actual">—</span><button onclick="SarlaftAuth.logout()">Salir</button></div>
-        </header>
-        <main class="mn-hero">
-            <p class="mn-eyebrow">CENTRO DE INTELIGENCIA · CUMPLIMIENTO Y RIESGO</p>
-            <h1 class="mn-title"><span>Inteligencia</span> <em>SARLAFT</em></h1>
-            <p class="mn-type"><span id="mn-typed"></span><i class="mn-caret"></i></p>
-            <div class="mn-cards">
-                <button class="mn-card" data-go="noticias" style="--a:#38bdd0;--i:0"><span class="mn-glow"></span><span class="mn-idx">01</span>
-                    <div class="mn-ico"><i class="fa-solid fa-newspaper"></i><u></u></div><h3>Análisis de Noticias</h3>
-                    <p>Investigación web profunda, extracción de entidades, debida diligencia y asistente con IA en tiempo real.</p>
-                    <div class="mn-stat"><b data-stat="noticias">0</b><small>sesiones en tu historial</small></div><span class="mn-go">Abrir módulo <i class="fa-solid fa-arrow-right"></i></span></button>
-                <button class="mn-card" data-go="cruce" style="--a:#a78bfa;--i:1"><span class="mn-glow"></span><span class="mn-idx">02</span>
-                    <div class="mn-ico"><i class="fa-solid fa-id-card"></i><u></u></div><h3>Cruce Masivo</h3>
-                    <p>Lectura multimodal de documentos y pantallazos, consolidación de perfil y evaluación financiera instantánea.</p>
-                    <div class="mn-stat"><b data-stat="cruce">0</b><small>cruces en tu historial</small></div><span class="mn-go">Abrir módulo <i class="fa-solid fa-arrow-right"></i></span></button>
-                <button class="mn-card" data-go="casos" style="--a:#e0b83a;--i:2"><span class="mn-glow"></span><span class="mn-idx">03</span>
-                    <div class="mn-ico"><i class="fa-solid fa-diagram-project"></i><u></u></div><h3>Casos de Investigación</h3>
-                    <p>Mapa de vínculos, transacciones, cronología, evidencias con cadena de custodia e informe tipo ROS.</p>
-                    <div class="mn-stat"><b data-stat="casos">0</b><small>casos activos</small></div><span class="mn-go">Abrir módulo <i class="fa-solid fa-arrow-right"></i></span></button>
+    <div id="view-menu" class="min-h-screen bg-[#f8f9fb] text-slate-950">
+        <header class="border-b border-slate-200 bg-white">
+            <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
+                <div class="flex items-center gap-3">
+                    <div class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-xs font-semibold tracking-widest">S</div>
+                    <div>
+                        <p class="text-sm font-semibold tracking-wide">SARLAFT</p>
+                        <p class="text-[10px] font-medium uppercase tracking-[0.16em] text-slate-500">Intelligence</p>
+                    </div>
+                </div>
+                <div class="flex min-w-0 items-center gap-3">
+                    <span id="usuario-actual" class="max-w-[42vw] truncate text-sm text-slate-600">—</span>
+                    <span class="h-4 w-px bg-slate-200"></span>
+                    <button onclick="SarlaftAuth.logout()" class="text-sm font-medium text-slate-600 transition hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-300">Salir</button>
+                </div>
             </div>
+        </header>
+        <main class="mx-auto max-w-7xl px-5 pb-16 pt-14 sm:px-8 sm:pt-20">
+            <div class="max-w-2xl">
+                <p class="text-sm font-medium text-slate-500">Espacio de trabajo</p>
+                <h1 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Inteligencia para decisiones de cumplimiento</h1>
+                <p class="mt-4 max-w-xl text-base leading-7 text-slate-600">Selecciona una herramienta para continuar tu análisis.</p>
+            </div>
+            <div class="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
+                <button type="button" class="group flex min-h-64 flex-col rounded-xl border border-slate-200 bg-white p-6 text-left transition hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300" data-go="noticias">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700"><i class="fa-solid fa-newspaper" aria-hidden="true"></i></span>
+                    <span role="heading" aria-level="2" class="mt-6 text-lg font-semibold tracking-tight">Análisis de noticias</span>
+                    <span class="mt-2 text-sm leading-6 text-slate-600">Consulta fuentes y revisa información relevante para la debida diligencia.</span>
+                    <span class="mt-auto flex w-full items-center justify-between border-t border-slate-100 pt-5 text-sm">
+                        <span class="text-slate-500"><span data-stat="noticias">0</span> sesiones</span>
+                        <span class="font-medium text-slate-800 group-hover:text-black">Abrir <i class="fa-solid fa-arrow-right ml-1 text-xs" aria-hidden="true"></i></span>
+                    </span>
+                </button>
+                <button type="button" class="group flex min-h-64 flex-col rounded-xl border border-slate-200 bg-white p-6 text-left transition hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300" data-go="cruce">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700"><i class="fa-solid fa-id-card" aria-hidden="true"></i></span>
+                    <span role="heading" aria-level="2" class="mt-6 text-lg font-semibold tracking-tight">Cruce masivo</span>
+                    <span class="mt-2 text-sm leading-6 text-slate-600">Consolida datos de clientes y revisa señales de riesgo financiero.</span>
+                    <span class="mt-auto flex w-full items-center justify-between border-t border-slate-100 pt-5 text-sm">
+                        <span class="text-slate-500"><span data-stat="cruce">0</span> cruces</span>
+                        <span class="font-medium text-slate-800 group-hover:text-black">Abrir <i class="fa-solid fa-arrow-right ml-1 text-xs" aria-hidden="true"></i></span>
+                    </span>
+                </button>
+                <button type="button" class="group flex min-h-64 flex-col rounded-xl border border-slate-200 bg-white p-6 text-left transition hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300" data-go="casos">
+                    <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i></span>
+                    <span role="heading" aria-level="2" class="mt-6 text-lg font-semibold tracking-tight">Casos de investigación</span>
+                    <span class="mt-2 text-sm leading-6 text-slate-600">Organiza sujetos, transacciones, evidencias y hallazgos en un caso.</span>
+                    <span class="mt-auto flex w-full items-center justify-between border-t border-slate-100 pt-5 text-sm">
+                        <span class="text-slate-500"><span data-stat="casos">0</span> casos activos</span>
+                        <span class="font-medium text-slate-800 group-hover:text-black">Abrir <i class="fa-solid fa-arrow-right ml-1 text-xs" aria-hidden="true"></i></span>
+                    </span>
+                </button>
+            </div>
+            <p class="mt-8 text-xs text-slate-500">Entorno privado de análisis</p>
         </main>
-        <footer class="mn-foot"><div class="mn-ticker"><div><span>LISTAS RESTRICTIVAS</span><span>PEP</span><span>NOTICIAS ADVERSAS</span><span>BENEFICIARIO FINAL</span><span>OPERACIONES INUSUALES</span><span>ROS</span><span>DEBIDA DILIGENCIA</span><span>FRACCIONAMIENTO</span><span>LISTAS RESTRICTIVAS</span><span>PEP</span><span>NOTICIAS ADVERSAS</span><span>BENEFICIARIO FINAL</span><span>OPERACIONES INUSUALES</span><span>ROS</span><span>DEBIDA DILIGENCIA</span><span>FRACCIONAMIENTO</span></div></div><span class="mn-keys">Atajos <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></span></footer>
     </div>
 
     <!-- ================= VISTA 1: INGRESAR NOTICIAS ================= -->

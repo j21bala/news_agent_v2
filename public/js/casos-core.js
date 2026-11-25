@@ -138,11 +138,11 @@
                 const pc = { baja: '#22c55e', media: '#38bdd0', alta: '#f59e0b', critica: '#ef4444' }[c.prioridad] || '#38bdd0';
                 return `<div class="cs-card cs-caso" data-id="${c.id}"><div class="cs-row between"><span class="cs-mu cs-sm">${esc(c.numero)}</span><span class="cs-badge" style="color:${pc}">${esc(c.prioridad)}</span></div>
                 <h3 style="margin:8px 0 4px;font-size:17px">${esc(c.titulo)}</h3><p class="cs-mu cs-sm">${esc(e)} · ${new Date(c.updated_at).toLocaleDateString('es-CO')}</p>
-                <div class="cs-row cs-sm cs-mu" style="margin-top:12px"><span><i class="fa-solid fa-user-group"></i> ${(d.nodos || []).length}</span><span><i class="fa-solid fa-link"></i> ${(d.vinculos || []).length}</span><span><i class="fa-solid fa-money-bill-transfer"></i> ${(d.tx || []).length}</span><span><i class="fa-solid fa-paperclip"></i> ${(d.evid || []).length}</span></div></div>`; }).join('')
+                <div class="cs-row cs-sm cs-mu" style="margin-top:12px"><span><i class="fa-solid fa-user-group"></i> ${(d.nodos || []).length}</span><span><i class="fa-solid fa-link"></i> ${(d.vinculos || []).length}</span><span><i class="fa-solid fa-money-bill-wave"></i> ${(d.tx || []).length}</span><span><i class="fa-solid fa-paperclip"></i> ${(d.evid || []).length}</span></div></div>`; }).join('')
                 : '<div class="cs-card cs-mu" style="grid-column:1/-1;text-align:center;padding:50px">Aún no tienes casos. Crea el primero con “Nuevo caso”.</div>';
         };
         try { const db = await SarlaftAuth.db(); const { data, error } = await db.from('casos').select('id,numero,titulo,estado,prioridad,updated_at,data').eq('archivado', false).order('updated_at', { ascending: false }).limit(200);
-            if (error) throw error; filas = data; } catch (e) { document.getElementById('cs-lista').innerHTML = `<div class="cs-card" style="color:#fca5a5">No se pudo cargar: ${esc(e.message)}<br><small>¿Ejecutaste supabase/casos_y_historial.sql?</small></div>`; return; }
+            if (error) throw error; filas = data; } catch (e) { document.getElementById('cs-lista').innerHTML = `<div class="cs-card" style="color:#b91c1c">No se pudo cargar: ${esc(e.message)}<br><small>¿Ejecutaste supabase/casos_y_historial.sql?</small></div>`; return; }
         pintar();
         document.getElementById('cs-q').oninput = pintar;
         document.getElementById('cs-lista').onclick = e => { const c = e.target.closest('.cs-caso'); if (c) abrir(c.dataset.id); };
@@ -163,7 +163,7 @@
     CS.abrir = abrir; CS.lista = lista;
 
     // ---------- Espacio de trabajo ----------
-    const TABS = [['resumen', 'fa-gauge-high', 'Resumen'], ['mapa', 'fa-diagram-project', 'Mapa'], ['sujetos', 'fa-users', 'Sujetos'], ['tx', 'fa-money-bill-transfer', 'Transacciones'], ['crono', 'fa-timeline', 'Cronología'], ['informe', 'fa-file-contract', 'Informe ROS'], ['evid', 'fa-paperclip', 'Evidencias'], ['audit', 'fa-shield-halved', 'Auditoría']];
+    const TABS = [['resumen', 'fa-gauge-high', 'Resumen'], ['mapa', 'fa-diagram-project', 'Mapa'], ['sujetos', 'fa-users', 'Sujetos'], ['tx', 'fa-money-bill-wave', 'Transacciones'], ['crono', 'fa-timeline', 'Cronología'], ['informe', 'fa-file-contract', 'Informe ROS'], ['evid', 'fa-paperclip', 'Evidencias'], ['audit', 'fa-clipboard-check', 'Auditoría']];
     function espacio() {
         const m = caso.data.meta;
         root.innerHTML = `<div class="cs-top"><button class="cs-btn" id="cs-back"><i class="fa-solid fa-arrow-left"></i> Casos</button>
