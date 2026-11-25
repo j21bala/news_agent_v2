@@ -6,32 +6,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .auth-ambient { position: fixed; width: 28rem; height: 28rem; border-radius: 50%; filter: blur(100px); opacity: .13; pointer-events: none; }
+        .auth-ambient-one { top: -18rem; left: calc(50% - 14rem); background: #e2e8f0; animation: auth-float 15s ease-in-out infinite alternate; }
+        .auth-ambient-two { right: -20rem; bottom: -20rem; background: #94a3b8; animation: auth-float 20s ease-in-out infinite alternate-reverse; }
+        @keyframes auth-float { to { transform: translate3d(2rem,2rem,0) scale(1.12); } }
+        .auth-mark { box-shadow: 0 0 20px rgba(255,255,255,.12),inset 0 0 14px rgba(255,255,255,.05); }
+        .auth-panel { background: linear-gradient(145deg,rgba(17,20,27,.96),rgba(8,10,14,.98)); box-shadow: 0 18px 60px rgba(0,0,0,.4),0 0 34px rgba(255,255,255,.035); }
+        .auth-input:focus { border-color: rgba(255,255,255,.72); box-shadow: 0 0 0 3px rgba(255,255,255,.1),0 0 18px rgba(255,255,255,.08); }
+        .auth-submit { box-shadow: 0 0 0 rgba(255,255,255,0); }
+        .auth-submit:hover { box-shadow: 0 0 24px rgba(255,255,255,.22); }
+        @media(prefers-reduced-motion:reduce) { .auth-ambient,.auth-submit { animation: none !important; transition: none !important; } }
+    </style>
 </head>
-<body class="min-h-screen bg-[#f7f8fa] px-4 text-slate-950 antialiased">
-    <main class="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center py-12">
+<body class="relative min-h-screen overflow-hidden bg-[#05070b] px-4 text-slate-100 antialiased">
+    <div class="auth-ambient auth-ambient-one" aria-hidden="true"></div>
+    <div class="auth-ambient auth-ambient-two" aria-hidden="true"></div>
+    <main class="relative z-10 mx-auto flex min-h-screen w-full max-w-md flex-col justify-center py-12">
         <div class="mb-8">
-            <div class="mb-8 flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-sm font-semibold tracking-widest">S</div>
-            <p class="mb-3 text-xs font-medium uppercase tracking-[0.18em] text-slate-500">SARLAFT Intelligence</p>
+            <div class="auth-mark mb-8 flex h-11 w-11 items-center justify-center rounded-xl border border-white/25 bg-white/[0.04] text-sm font-semibold tracking-widest text-white">S</div>
+            <p class="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-slate-400">SARLAFT Intelligence</p>
             <h1 class="text-3xl font-semibold tracking-tight">Inicia sesión</h1>
-            <p class="mt-2 text-sm leading-6 text-slate-600">Accede a tu espacio de análisis seguro.</p>
+            <p class="mt-2 text-sm leading-6 text-slate-400">Accede a tu espacio de análisis seguro.</p>
         </div>
 
-        <form id="form-login" class="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <form id="form-login" class="auth-panel space-y-5 rounded-2xl border border-white/10 p-6 sm:p-8">
             <div>
-                <label for="email" class="mb-2 block text-sm font-medium text-slate-800">Correo corporativo</label>
+                <label for="email" class="mb-2 block text-sm font-medium text-slate-200">Correo corporativo</label>
                 <input type="email" id="email" name="email" required autocomplete="username"
-                    class="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
+                    class="auth-input w-full rounded-lg border border-white/15 bg-black/40 px-3.5 py-3 text-sm text-white outline-none transition placeholder:text-slate-500">
             </div>
             <div>
-                <label for="password" class="mb-2 block text-sm font-medium text-slate-800">Contraseña</label>
+                <label for="password" class="mb-2 block text-sm font-medium text-slate-200">Contraseña</label>
                 <input type="password" id="password" name="password" required autocomplete="current-password"
-                    class="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200">
+                    class="auth-input w-full rounded-lg border border-white/15 bg-black/40 px-3.5 py-3 text-sm text-white outline-none transition placeholder:text-slate-500">
             </div>
             <button type="submit" id="btn-login"
-                class="w-full rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-60">
+                class="auth-submit w-full rounded-lg bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-white/70 focus:ring-offset-2 focus:ring-offset-[#0b0d12] disabled:cursor-wait disabled:opacity-60">
                 Entrar
             </button>
-            <p id="login-error" role="alert" class="hidden text-sm text-red-700"></p>
+            <p id="login-error" role="alert" class="hidden text-sm text-red-400"></p>
         </form>
 
         <p class="mt-6 text-center text-xs text-slate-500">Acceso privado para usuarios autorizados</p>

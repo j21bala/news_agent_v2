@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="./css/casos.css">
     <link rel="stylesheet" href="./css/noticias.css">
+    <link rel="stylesheet" href="./css/menu.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -75,59 +76,70 @@
 <body class="bg-navy text-slate-100 font-sans min-h-screen selection:bg-teal selection:text-white">
 
     <!-- ================= MENÚ PRINCIPAL ================= -->
-    <div id="view-menu" class="min-h-screen bg-[#f8f9fb] text-slate-950">
-        <header class="border-b border-slate-200 bg-white">
+    <div id="view-menu" class="mn-root relative min-h-screen overflow-hidden bg-[#05070d] text-slate-100">
+        <div class="mn-aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="mn-grid" aria-hidden="true"></div>
+        <div class="mn-vig" aria-hidden="true"></div>
+        <header class="mn-top relative z-10 border-b border-white/10 bg-black/25 backdrop-blur-md">
             <div class="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
-                <div class="flex items-center gap-3">
-                    <div class="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-xs font-semibold tracking-widest">S</div>
+                <div class="mn-brand flex items-center gap-3">
+                    <div class="mn-mark flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/[0.04] text-sm font-semibold tracking-widest">S</div>
                     <div>
-                        <p class="text-sm font-semibold tracking-wide">SARLAFT</p>
-                        <p class="text-[10px] font-medium uppercase tracking-[0.16em] text-slate-500">Intelligence</p>
+                        <p class="text-sm font-semibold tracking-[0.16em]">SARLAFT</p>
+                        <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-slate-400">Intelligence</p>
                     </div>
                 </div>
-                <div class="flex min-w-0 items-center gap-3">
-                    <span id="usuario-actual" class="max-w-[42vw] truncate text-sm text-slate-600">—</span>
-                    <span class="h-4 w-px bg-slate-200"></span>
-                    <button onclick="SarlaftAuth.logout()" class="text-sm font-medium text-slate-600 transition hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-300">Salir</button>
+                <div class="mn-user flex min-w-0 items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
+                    <i class="fa-solid fa-user-shield text-slate-300" aria-hidden="true"></i>
+                    <span id="usuario-actual" class="max-w-[42vw] truncate text-xs text-slate-300">—</span>
+                    <span class="h-4 w-px bg-white/15"></span>
+                    <button onclick="SarlaftAuth.logout()" class="text-xs font-medium text-slate-300 transition hover:text-white focus:outline-none focus:ring-2 focus:ring-white/40">Salir</button>
                 </div>
             </div>
         </header>
-        <main class="mx-auto max-w-7xl px-5 pb-16 pt-14 sm:px-8 sm:pt-20">
-            <div class="max-w-2xl">
-                <p class="text-sm font-medium text-slate-500">Espacio de trabajo</p>
-                <h1 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">Inteligencia para decisiones de cumplimiento</h1>
-                <p class="mt-4 max-w-xl text-base leading-7 text-slate-600">Selecciona una herramienta para continuar tu análisis.</p>
+        <main class="mn-hero relative z-10 mx-auto max-w-7xl px-5 pb-16 pt-14 sm:px-8 sm:pt-20">
+            <div class="mx-auto max-w-3xl text-center">
+                <p class="mn-eyebrow text-xs font-semibold uppercase tracking-[0.28em] text-cyan-300">CENTRO DE INTELIGENCIA · CUMPLIMIENTO Y RIESGO</p>
+                <h1 class="mn-title mt-5 text-4xl font-semibold tracking-tight sm:text-6xl"><span>Inteligencia</span> <em>SARLAFT</em></h1>
+                <p class="mn-type mt-5 text-sm text-slate-400 sm:text-base"><span id="mn-typed">Debida diligencia en tiempo real</span><i class="mn-caret" aria-hidden="true"></i></p>
+                <p class="mt-2 text-sm text-slate-500">Selecciona una herramienta para continuar.</p>
             </div>
-            <div class="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
-                <button type="button" class="group flex min-h-64 flex-col rounded-xl border border-slate-200 bg-white p-6 text-left transition hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300" data-go="noticias">
-                    <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700"><i class="fa-solid fa-newspaper" aria-hidden="true"></i></span>
-                    <span role="heading" aria-level="2" class="mt-6 text-lg font-semibold tracking-tight">Análisis de noticias</span>
-                    <span class="mt-2 text-sm leading-6 text-slate-600">Consulta fuentes y revisa información relevante para la debida diligencia.</span>
-                    <span class="mt-auto flex w-full items-center justify-between border-t border-slate-100 pt-5 text-sm">
-                        <span class="text-slate-500"><span data-stat="noticias">0</span> sesiones</span>
-                        <span class="font-medium text-slate-800 group-hover:text-black">Abrir <i class="fa-solid fa-arrow-right ml-1 text-xs" aria-hidden="true"></i></span>
+            <div class="mn-cards mt-12 grid grid-cols-1 gap-5 md:grid-cols-3">
+                <button type="button" class="mn-card group relative flex min-h-72 flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70 p-6 text-left text-slate-100 transition focus:outline-none focus:ring-2 focus:ring-white/60" data-go="noticias" style="--a:#38bdd0;--i:0">
+                    <span class="mn-glow" aria-hidden="true"></span><span class="mn-idx">01</span>
+                    <span class="mn-ico"><i class="fa-solid fa-newspaper" aria-hidden="true"></i><u aria-hidden="true"></u></span>
+                    <span role="heading" aria-level="2" class="mn-card-title text-lg font-semibold">Análisis de noticias</span>
+                    <span class="mt-2 text-sm leading-6 text-slate-400">Consulta fuentes y revisa información relevante para la debida diligencia.</span>
+                    <span class="mn-stat mt-auto flex items-center justify-between border-t border-white/10 pt-5">
+                        <span class="text-xs text-slate-400"><b data-stat="noticias">0</b> sesiones</span>
+                        <span class="mn-go text-sm font-medium">Abrir módulo <i class="fa-solid fa-arrow-right ml-2 text-xs" aria-hidden="true"></i></span>
                     </span>
                 </button>
-                <button type="button" class="group flex min-h-64 flex-col rounded-xl border border-slate-200 bg-white p-6 text-left transition hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300" data-go="cruce">
-                    <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700"><i class="fa-solid fa-id-card" aria-hidden="true"></i></span>
-                    <span role="heading" aria-level="2" class="mt-6 text-lg font-semibold tracking-tight">Cruce masivo</span>
-                    <span class="mt-2 text-sm leading-6 text-slate-600">Consolida datos de clientes y revisa señales de riesgo financiero.</span>
-                    <span class="mt-auto flex w-full items-center justify-between border-t border-slate-100 pt-5 text-sm">
-                        <span class="text-slate-500"><span data-stat="cruce">0</span> cruces</span>
-                        <span class="font-medium text-slate-800 group-hover:text-black">Abrir <i class="fa-solid fa-arrow-right ml-1 text-xs" aria-hidden="true"></i></span>
+                <button type="button" class="mn-card group relative flex min-h-72 flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70 p-6 text-left text-slate-100 transition focus:outline-none focus:ring-2 focus:ring-white/60" data-go="cruce" style="--a:#a78bfa;--i:1">
+                    <span class="mn-glow" aria-hidden="true"></span><span class="mn-idx">02</span>
+                    <span class="mn-ico"><i class="fa-solid fa-id-card" aria-hidden="true"></i><u aria-hidden="true"></u></span>
+                    <span role="heading" aria-level="2" class="mn-card-title text-lg font-semibold">Cruce masivo</span>
+                    <span class="mt-2 text-sm leading-6 text-slate-400">Consolida datos de clientes y revisa señales de riesgo financiero.</span>
+                    <span class="mn-stat mt-auto flex items-center justify-between border-t border-white/10 pt-5">
+                        <span class="text-xs text-slate-400"><b data-stat="cruce">0</b> cruces</span>
+                        <span class="mn-go text-sm font-medium">Abrir módulo <i class="fa-solid fa-arrow-right ml-2 text-xs" aria-hidden="true"></i></span>
                     </span>
                 </button>
-                <button type="button" class="group flex min-h-64 flex-col rounded-xl border border-slate-200 bg-white p-6 text-left transition hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300" data-go="casos">
-                    <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i></span>
-                    <span role="heading" aria-level="2" class="mt-6 text-lg font-semibold tracking-tight">Casos de investigación</span>
-                    <span class="mt-2 text-sm leading-6 text-slate-600">Organiza sujetos, transacciones, evidencias y hallazgos en un caso.</span>
-                    <span class="mt-auto flex w-full items-center justify-between border-t border-slate-100 pt-5 text-sm">
-                        <span class="text-slate-500"><span data-stat="casos">0</span> casos activos</span>
-                        <span class="font-medium text-slate-800 group-hover:text-black">Abrir <i class="fa-solid fa-arrow-right ml-1 text-xs" aria-hidden="true"></i></span>
+                <button type="button" class="mn-card group relative flex min-h-72 flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950/70 p-6 text-left text-slate-100 transition focus:outline-none focus:ring-2 focus:ring-white/60" data-go="casos" style="--a:#e0b83a;--i:2">
+                    <span class="mn-glow" aria-hidden="true"></span><span class="mn-idx">03</span>
+                    <span class="mn-ico"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i><u aria-hidden="true"></u></span>
+                    <span role="heading" aria-level="2" class="mn-card-title text-lg font-semibold">Casos de investigación</span>
+                    <span class="mt-2 text-sm leading-6 text-slate-400">Organiza sujetos, transacciones, evidencias y hallazgos en un caso.</span>
+                    <span class="mn-stat mt-auto flex items-center justify-between border-t border-white/10 pt-5">
+                        <span class="text-xs text-slate-400"><b data-stat="casos">0</b> casos activos</span>
+                        <span class="mn-go text-sm font-medium">Abrir módulo <i class="fa-solid fa-arrow-right ml-2 text-xs" aria-hidden="true"></i></span>
                     </span>
                 </button>
             </div>
-            <p class="mt-8 text-xs text-slate-500">Entorno privado de análisis</p>
+            <div class="mn-foot mt-10 flex items-center justify-between gap-4 border-t border-white/10 pt-5 text-xs text-slate-500">
+                <span>Entorno privado de análisis</span>
+                <span class="mn-keys">Atajos <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></span>
+            </div>
         </main>
     </div>
 
