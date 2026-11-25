@@ -22,16 +22,21 @@
     const ESTADOS = [['abierto', 'Abierto'], ['analisis', 'En análisis'], ['comite', 'En comité'], ['ros', 'ROS reportado'], ['archivado', 'Archivado sin ROS'], ['cerrado', 'Cerrado']];
     const PRIOR = [['baja', 'Baja'], ['media', 'Media'], ['alta', 'Alta'], ['critica', 'Crítica']];
     const TX_TIPOS = ['Consignación en efectivo', 'Retiro en efectivo', 'Transferencia', 'Cheque', 'Pago PSE', 'Giro internacional', 'Inversión / fiducia', 'Otro'];
-    const FICHA = [['tipo_id', 'Tipo ID'], ['id_cliente', 'N.º identificación'], ['nombres_apellidos', 'Nombres y apellidos'], ['fecha_nacimiento', 'Fecha nacimiento', 'date'], ['lugar_nacimiento', 'Lugar nacimiento'],
+    const FICHA = [['tipo_id', 'Tipo ID'], ['id_cliente', 'N.º identificación'], ['nombres_apellidos', 'Nombres y apellidos'], ['edad', 'Edad', 'number'], ['fecha_nacimiento', 'Fecha nacimiento', 'date'], ['lugar_nacimiento', 'Lugar nacimiento'],
         ['genero', 'Género'], ['estado_civil', 'Estado civil'], ['actividad_economica', 'Actividad económica'], ['nivel_riesgo_actividad', 'Riesgo actividad'], ['ocupacion', 'Ocupación'], ['profesion', 'Profesión'],
-        ['empresa_empleadora', 'Empresa empleadora'], ['segmento_sarlaft', 'Segmento SARLAFT'], ['perfil_riesgo_sarlaft', 'Perfil riesgo SARLAFT'], ['ingresos', 'Ingresos mensuales', 'number'], ['egresos', 'Egresos mensuales', 'number'],
+        ['empresa_empleadora', 'Empresa empleadora'], ['nivel_educativo', 'Nivel educativo'], ['segmento_sarlaft', 'Segmento SARLAFT'], ['perfil_riesgo_sarlaft', 'Perfil riesgo SARLAFT'], ['ingresos', 'Ingresos mensuales', 'number'], ['egresos', 'Egresos mensuales', 'number'],
         ['valor_activos', 'Activos', 'number'], ['valor_pasivos', 'Pasivos', 'number'], ['direccion', 'Dirección'], ['ciudad', 'Ciudad'], ['oficina_administra', 'Oficina que administra'],
         ['fecha_creacion', 'Fecha vinculación', 'date'], ['fecha_ultima_actualizacion', 'Última actualización', 'date'], ['operaciones_internacionales', 'Operaciones internacionales'], ['origen_fondos', 'Origen de fondos'], ['origen_activos', 'Origen de activos']];
 
     const nuevoData = () => ({
         meta: { asunto: '', ciudad: '', oficina: '', apertura: hoy(), umbral: 10000000, titulo: 'Caso sin título', numero: '', estado: 'abierto', prioridad: 'media', decision: { ros: false, archivo: false, gestion_comercial: false } },
         nodos: [], vinculos: [], tx: [], crono: [], hallazgos: [], evid: [],
-        informe: { riesgos: '', criterios: '', indicio: '', comite: '', hechos: '', gestion: '', validaciones: '', conclusion: '' }, vista: null
+        informe: {
+            riesgos: '', criterios: '', indicio: '', comite: '', hechos: '', gestion: '', validaciones: '', conclusion: '',
+            caracteristicas_sospecha: '', metodologia: '', reportes_anteriores: '', senales_alerta: '', motivo_reporte: '',
+            conclusion_acumulados: '',
+            tipo_cliente: '', perfil_financiero: '', comparacion_sector: '', calificacion_reporte: '', urgencia: ''
+        }, vista: null
     });
 
     let caso = null, main = null, timer = null, sucio = false, root = null, tabAct = 'resumen';
