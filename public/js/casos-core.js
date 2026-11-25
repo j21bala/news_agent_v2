@@ -121,7 +121,7 @@
         return { cred: sum(cr), deb: sum(de), al, score, grado, porTipo, ntx: tx.length };
     };
     CS.nivel = s => s >= 70 ? ['Crítico', '#ef4444'] : s >= 40 ? ['Elevado', '#f59e0b'] : s >= 15 ? ['Moderado', '#38bdd0'] : ['Bajo', '#22c55e'];
-    CS.addNodo = (tipo, nombre) => { const n = { id: uid(), tipo, nombre: nombre || 'Nuevo ' + T_NODO[tipo].n.toLowerCase(), rol: '', riesgo: 'na', pep: false, doc: '', desc: '', flags: '', src: '', evid: '', banco: false, fid: false, prods: [], ficha: {}, x: null, y: null };
+    CS.addNodo = (tipo, nombre) => { const n = { id: uid(), tipo, nombre: nombre || 'Nuevo ' + T_NODO[tipo].n.toLowerCase(), rol: '', riesgo: 'na', pep: false, doc: '', foto: '', desc: '', flags: '', src: '', evid: '', banco: false, fid: false, prods: [], ficha: {}, x: null, y: null };
         caso.data.nodos.push(n); CS.dirty('nodos'); return n; };
     CS.delNodo = id => { const d = caso.data; d.nodos = d.nodos.filter(n => n.id !== id); d.vinculos = d.vinculos.filter(v => v.de !== id && v.a !== id); CS.dirty('nodos'); };
     CS.irNodo = id => { CS.sel = { k: 'n', id }; CS.tab('mapa'); };
